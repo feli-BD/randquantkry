@@ -44,6 +44,3 @@ def build_hamiltonian(n_qubits: int,  terms: list[tuple[str, int, float]], angle
 
     hamiltonian = SparsePauliOp(labels, coeffs=np.array(coefficients, dtype=complex))
     return hamiltonian
-
-hamiltonian = build_hamiltonian(4, [('XX', 0, 1.0), ('ZZ', 1, 0.5)])
-print(hamiltonian)
