@@ -97,15 +97,19 @@ def time_evolve_krylov(hamiltonian, initial_state, time, krylov_dim):
         betas.append(beta_m)
         V.append(mat_vec_prod / beta_m) # next Krylov vector
 
-        # assemble the tridiagonal matrix
-        T = np.tridiagonal_matrix(alphas, betas)
+    # assemble the tridiagonal matrix
+    k = len(alphas)
+    betas_for_tridiagonal = betas[:k-1] if k>1 else [] # fix: in case early break alphas different shape than betas
+    Tri = np.diag(alphas) + np.diag(betas_for_tridiagonal, k=1) + np.diag(betas_for_tridiagonal, k=-1)
 
-        # evolve in the Krylov subspace 
-        evolved_state_krylov = expm(-1j * T * time) @ np.array([1] + [0] * (len(V) - 1))
-        evolved_state = np.linalg.norm(initial_state) * (np.array(V[:-1]) @ evolved_state_krylov)
+    # evolve in the Krylov subspace 
+    e1 = np.zeros(k, dtype=complex)
+    e1[0] = 1.0  # initial state in Krylov subspace
+    evolved_state_krylov = expm(-1j * Tri * time) @ e1
+    evolved_state = np.linalg.norm(initial_state) * np.array(V[:k]).T @ evolved_state_krylov
 
-        # TODO: add logging and fail loud option for when krylov_dim is too small and the approximation is not accurate enough
-        return evolved_state
+    # TODO: add logging and fail loud option for when krylov_dim is too small and the approximation is not accurate enough
+    return evolved_state
 
 
 
