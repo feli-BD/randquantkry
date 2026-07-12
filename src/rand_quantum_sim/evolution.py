@@ -135,3 +135,58 @@ def time_evolve_randomized_krylov(hamiltonian, initial_state, time, krylov_dim, 
     array-like
         The evolved state of the quantum system.
     """
+
+    H = hamiltonian.to_matrix()
+    v = initial_state / np.linalg.norm(initial_state)
+    V = [v]  # list to store Krylov vectors
+
+    # Random matrix 
+    S = np.random.randn(num_random_vectors, H.shape[0]) + 1j * np.random.randn(num_random_vectors, H.shape[0])
+    
+    SV = [S @ v]  # list to store sketched Krylov vectors
+
+    # store orthogonalized vectors and coefficients
+    alphas = []
+    betas = []
+
+    for m in range(krylov_dim):
+        
+        # cheap matrix vector product
+        mat_vec_prod = H @ V[m]
+
+        S_mat_vec_prod = S @ mat_vec_prod  # sketch the matrix-vector product
+
+        # orthogonalize using sketched vectors
+        alpha_m = np.conjugate(SV[m]) @ S_mat_vec_prod
+        mat_vec_prod -= alpha_m * V[m]
+        S_mat_vec_prod -= alpha_m * SV[m]
+
+
+        for i in range(m):
+            overlap = np.conjugate(SV[i]) @ S_mat_vec_prod
+            mat_vec_prod -= overlap * V[i]
+            S_mat_vec_prod -= overlap * SV[i]
+    
+        alphas.append(alpha_m)
+        beta_m = np.linalg.norm(S_mat_vec_prod)
+
+        if beta_m < 1e-12:
+            break
+
+        betas.append(beta_m)
+        V.append(mat_vec_prod / beta_m) # next Krylov vector
+        SV.append(S_mat_vec_prod / beta_m)  # next sketched Krylov vector
+
+    # assemble the tridiagonal matrix
+    k = len(alphas)
+    betas_for_tridiagonal = betas[:k-1] if k>1 else [] # fix: in case early break alphas different shape than betas
+    Tri = np.diag(alphas) + np.diag(betas_for_tridiagonal, k=1) + np.diag(betas_for_tridiagonal, k=-1)
+
+    # evolve in the Krylov subspace 
+    e1 = np.zeros(k, dtype=complex)
+    e1[0] = 1.0  # initial state in Krylov subspace
+    evolved_state_krylov = expm(-1j * Tri * time) @ e1
+    evolved_state = np.linalg.norm(initial_state) * np.array(V[:k]).T @ evolved_state_krylov
+
+    # TODO: add logging and fail loud option for when krylov_dim is too small and the approximation is not accurate enough
+    return evolved_state
