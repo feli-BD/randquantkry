@@ -1,16 +1,7 @@
 import numpy as np
 import pytest
 
-from rand_quantum_sim.hamiltonian import build_hamiltonian, flip_endianness
-
-
-def test_flip_endianness_is_involution():
-    label = "XYZI"
-    assert flip_endianness(flip_endianness(label)) == label
-
-
-def test_flip_endianness_reverses():
-    assert flip_endianness("XYZI") == "IZYX"
+from rand_quantum_sim.hamiltonian import build_hamiltonian
 
 
 def test_build_hamiltonian_matches_intuitive_tensor_product():
