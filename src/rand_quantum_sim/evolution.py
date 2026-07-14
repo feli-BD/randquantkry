@@ -215,7 +215,7 @@ def time_evolve_randomized_krylov(hamiltonian, initial_state, time, krylov_dim, 
     v = initial_state / np.linalg.norm(initial_state)
     V = [v]  # list to store Krylov vectors
 
-    # Random matrix 
+    # Random matrix using 
     S = np.random.randn(num_random_vectors, H.shape[0]) + 1j * np.random.randn(num_random_vectors, H.shape[0])
     log.debug("time_evolve_randomized_krylov: sketch matrix drawn", extra={"context": {"S_shape": S.shape}})
     
@@ -233,19 +233,17 @@ def time_evolve_randomized_krylov(hamiltonian, initial_state, time, krylov_dim, 
         S_mat_vec_prod = S @ mat_vec_prod  # sketch the matrix-vector product
 
         # orthogonalize using sketched vectors
-        alpha_m = np.conjugate(SV[m]) @ S_mat_vec_prod
+        alpha_m = np.conjugate(V[m]) @ mat_vec_prod
         mat_vec_prod -= alpha_m * V[m]
-        S_mat_vec_prod -= alpha_m * SV[m]
 
 
         for i in range(m):
-            overlap = np.conjugate(SV[i]) @ S_mat_vec_prod
+            overlap = np.conjugate(V[i]) @ mat_vec_prod
             mat_vec_prod -= overlap * V[i]
-            S_mat_vec_prod -= overlap * SV[i]
-    
-        alphas.append(alpha_m)
-        beta_m = np.linalg.norm(S_mat_vec_prod)
 
+        alphas.append(alpha_m)
+        beta_m = np.linalg.norm(mat_vec_prod)
+        
         log.debug(
             "time_evolve_randomized_krylov: iteration",
             extra={"context": {
@@ -264,8 +262,10 @@ def time_evolve_randomized_krylov(hamiltonian, initial_state, time, krylov_dim, 
             break
 
         betas.append(beta_m)
-        V.append(mat_vec_prod / beta_m) # next Krylov vector
-        SV.append(S_mat_vec_prod / beta_m)  # next sketched Krylov vector
+        new_vector = mat_vec_prod / beta_m
+        V.append(new_vector) # next Krylov vectornew_vec = mat_vec_prod / beta_m
+        SV.append(S @ new_vector) # next sketched Krylov vector
+
 
     # assemble the tridiagonal matrix
     k = len(alphas)
