@@ -6,8 +6,12 @@
 ###########################################################################
 
 # imports
+from tracemalloc import start
+
+from tracemalloc import start
+
 from scipy import linalg
-from scipy.linalg import expm
+from scipy.linalg import expm, solve_triangular
 from scipy import sparse
 from scipy.fft import dct
 import numpy as np
@@ -177,7 +181,7 @@ def time_evolve_krylov(hamiltonian, initial_state, time, krylov_dim):
 
 
 
-def time_evolve_randomized_krylov(hamiltonian, initial_state, time, krylov_dim, num_random_vectors, seed=67):
+def time_evolve_randomized_krylov(hamiltonian, initial_state, time, krylov_dim, num_random_vectors,trunc=2, seed=67):
     """
     Perform time evolution using the randomized Krylov subspace method.
 
@@ -193,6 +197,8 @@ def time_evolve_randomized_krylov(hamiltonian, initial_state, time, krylov_dim, 
         The dimension of the Krylov subspace.
     num_random_vectors : int
         The number of random vectors to use in the randomized Krylov method.
+    trunc : int, optional
+        The truncation parameter for the randomized Krylov method.
     seed : int, optional
         Seed for numpy's global RNG before the randomized method runs, so
         results are reproducible run-to-run.
@@ -257,7 +263,8 @@ def time_evolve_randomized_krylov(hamiltonian, initial_state, time, krylov_dim, 
         mat_vec_prod -= alpha_m * V[m]
 
 
-        for i in range(m):
+        start = max(0, m - trunc + 1)
+        for i in range(start, m):
             overlap = np.conjugate(V[i]) @ mat_vec_prod
             mat_vec_prod -= overlap * V[i]
 
@@ -285,6 +292,135 @@ def time_evolve_randomized_krylov(hamiltonian, initial_state, time, krylov_dim, 
         new_vector = mat_vec_prod / beta_m
         V.append(new_vector) # next Krylov vectornew_vec = mat_vec_prod / beta_m
         SV.append(S(new_vector)) # next sketched Krylov vector
+
+
+    # assemble the tridiagonal matrix
+    
+    k = len(V) - 1                       # number of accepted Krylov vectors
+    Sb = S(initial_state)
+    SV_mat = np.array(SV[:k]).T           # s x k
+    SAV_mat = np.array(SAV[:k]).T         # s x k  (you'll need to build SAV the same way as SV -- see note below)
+
+    Q, R = np.linalg.qr(SV_mat)
+    SVw = Q
+    SAVw = solve_triangular(R.T, SAV_mat.T, lower=True).T
+
+    M = SVw.conj().T @ SVw
+    M_pinv = np.linalg.pinv(M)
+    H_tilde = M_pinv @ (SVw.conj().T @ SAVw)
+    c_b = M_pinv @ (SVw.conj().T @ Sb)
+
+    coeffs = expm(-1j * H_tilde * time) @ c_b
+    y = solve_triangular(R, coeffs)
+
+    evolved_state = np.array(V[:k]).T @ y
+
+    log.info(
+        "time_evolve_randomized_krylov: complete",
+        extra={"context": {
+            "evolved_state_norm": float(np.linalg.norm(evolved_state)),
+        }},
+    )
+
+    return evolved_state
+
+
+def time_evolve_randomized_krylov_gaussian(hamiltonian, initial_state, time, krylov_dim, num_random_vectors, seed):
+    """
+    Perform time evolution using the randomized Krylov subspace method.
+
+    Parameters
+    ----------
+    hamiltonian : function
+        The Hamiltonian function.
+    initial_state : array-like
+        The initial state of the quantum system.
+    time : float
+        The evolution time.
+    krylov_dim : int
+        The dimension of the Krylov subspace.
+    num_random_vectors : int
+        The number of random vectors to use in the randomized Krylov method.
+    seed: int
+        Random seed
+
+    Returns
+    -------
+    array-like
+        The evolved state of the quantum system.
+    """
+    log.info(
+        "time_evolve_randomized_krylov: starting",
+        extra={"context": {
+            "n_qubits": hamiltonian.num_qubits,
+            "matrix_dim": 2 ** hamiltonian.num_qubits,
+            "time": time,
+            "krylov_dim_requested": krylov_dim,
+            "num_random_vectors": num_random_vectors,
+        }},
+    )
+    log.warning(
+        "time_evolve_randomized_krylov: no random seed is passed/logged by this function; "
+        "runs using the global numpy RNG are not reproducible from this log alone"
+    )
+
+    H = hamiltonian.to_matrix()
+    v = initial_state / np.linalg.norm(initial_state)
+    V = [v]  # list to store Krylov vectors
+
+    # Random matrix using 
+    S = np.random.randn(num_random_vectors, H.shape[0]) + 1j * np.random.randn(num_random_vectors, H.shape[0])
+    log.debug("time_evolve_randomized_krylov: sketch matrix drawn", extra={"context": {"S_shape": S.shape}})
+    
+    SV = [S @ v]  # list to store sketched Krylov vectors
+
+    # store orthogonalized vectors and coefficients
+    alphas = []
+    betas = []
+
+    for m in range(krylov_dim):
+        
+        # cheap matrix vector product
+        mat_vec_prod = H @ V[m]
+
+        S_mat_vec_prod = S @ mat_vec_prod  # sketch the matrix-vector product
+
+        # orthogonalize using sketched vectors
+        alpha_m = np.conjugate(V[m]) @ mat_vec_prod
+        mat_vec_prod -= alpha_m * V[m]
+
+        for i in range(m):
+            overlap = np.conjugate(V[i]) @ mat_vec_prod
+            mat_vec_prod -= overlap * V[i]
+            S_mat_vec_prod -= overlap * SV[i]
+    
+
+        alphas.append(alpha_m)
+        beta_m = np.linalg.norm(mat_vec_prod)
+        
+        log.debug(
+            "time_evolve_randomized_krylov: iteration",
+            extra={"context": {
+                "iteration": m,
+                "alpha_m": complex(alpha_m),
+                "beta_m_sketch": float(beta_m),
+                "true_norm_before_normalize": float(np.linalg.norm(mat_vec_prod)),
+            }},
+        )
+
+        if beta_m < 1e-12:
+            log.info(
+                "time_evolve_randomized_krylov: happy breakdown",
+                extra={"context": {"iteration": m, "beta_m": float(beta_m)}},
+            )
+            break
+
+        betas.append(beta_m)
+        V.append(mat_vec_prod / beta_m) # next Krylov vector
+        SV.append(S_mat_vec_prod / beta_m)  # next sketched Krylov vector
+        new_vector = mat_vec_prod / beta_m
+        V.append(new_vector) # next Krylov vectornew_vec = mat_vec_prod / beta_m
+        SV.append(S @ new_vector) # next sketched Krylov vector
 
 
     # assemble the tridiagonal matrix
