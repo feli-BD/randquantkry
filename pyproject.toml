@@ -28,6 +28,8 @@ dev = [
     "qiskit>=1.0",
     "build",
     "twine",
+    "pytest>=7.0",
+    "pytest-cov",
 ]
 
 [tool.setuptools]
