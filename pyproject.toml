@@ -32,6 +32,9 @@ dev = [
     "pytest-cov",
 ]
 
-[tool.setuptools]
-package-dir = {"" = "src", "utils" = "utils"}
-packages = ["rand_quantum_sim", "utils"]
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"
