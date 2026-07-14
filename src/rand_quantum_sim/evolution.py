@@ -11,6 +11,10 @@ from scipy.linalg import expm
 from scipy import sparse
 import numpy as np
 
+from utils.logging_config import get_logger
+
+log = get_logger(__name__)
+
 def time_evolve_naive(hamiltonian, initial_state, time):
     """
     Perform naive time evolution of a quantum system.
@@ -31,15 +35,34 @@ def time_evolve_naive(hamiltonian, initial_state, time):
     evolved_state : array-like
         The evolved state of the quantum system.
     """
+    log.info(
+        "time_evolve_naive: starting",
+        extra={"context": {
+            "n_qubits": hamiltonian.num_qubits,
+            "matrix_dim": 2 ** hamiltonian.num_qubits,
+            "time": time,
+        }},
+    )
+
     # calculate eigenvector and eigenvalues of the Hamiltonian
     H = hamiltonian.to_matrix()
+    log.debug("time_evolve_naive: densified Hamiltonian", extra={"context": {"H_shape": H.shape}})
+
     eigenvals, eigenvecs = np.linalg.eigh(H)
+    log.debug("time_evolve_naive: eigendecomposition complete", extra={"context": {"n_eigenvalues": len(eigenvals)}})
 
     # compute phase factors
     phases = np.exp(-1j * eigenvals * time)
     # Evolve initial state using unitary
     unitary = eigenvecs @ np.diag(phases) @ eigenvecs.conj().T 
     evolved_state = unitary @ initial_state
+
+    log.info(
+        "time_evolve_naive: complete",
+        extra={"context": {
+            "evolved_state_norm": float(np.linalg.norm(evolved_state)),
+        }},
+    )
 
     #TODO: add fail loud option for when qubits are too many and the matrix is too large to compute
 
@@ -67,6 +90,15 @@ def time_evolve_krylov(hamiltonian, initial_state, time, krylov_dim):
     array-like
         The evolved state of the quantum system.
     """
+    log.info(
+        "time_evolve_krylov: starting",
+        extra={"context": {
+            "n_qubits": hamiltonian.num_qubits,
+            "matrix_dim": 2 ** hamiltonian.num_qubits,
+            "time": time,
+            "krylov_dim_requested": krylov_dim,
+        }},
+    )
 
     H = hamiltonian.to_matrix()
     v = initial_state / np.linalg.norm(initial_state)
@@ -91,7 +123,20 @@ def time_evolve_krylov(hamiltonian, initial_state, time, krylov_dim):
         alphas.append(alpha_m)
         beta_m = np.linalg.norm(mat_vec_prod)
 
+        log.debug(
+            "time_evolve_krylov: iteration",
+            extra={"context": {
+                "iteration": m,
+                "alpha_m": complex(alpha_m),
+                "beta_m": float(beta_m),
+            }},
+        )
+
         if beta_m < 1e-12:
+            log.info(
+                "time_evolve_krylov: happy breakdown",
+                extra={"context": {"iteration": m, "beta_m": float(beta_m)}},
+            )
             break
 
         betas.append(beta_m)
@@ -102,11 +147,27 @@ def time_evolve_krylov(hamiltonian, initial_state, time, krylov_dim):
     betas_for_tridiagonal = betas[:k-1] if k>1 else [] # fix: in case early break alphas different shape than betas
     Tri = np.diag(alphas) + np.diag(betas_for_tridiagonal, k=1) + np.diag(betas_for_tridiagonal, k=-1)
 
+    log.info(
+        "time_evolve_krylov: basis built",
+        extra={"context": {
+            "krylov_dim_requested": krylov_dim,
+            "k_reached": k,
+            "Tri_shape": Tri.shape,
+        }},
+    )
+
     # evolve in the Krylov subspace 
     e1 = np.zeros(k, dtype=complex)
     e1[0] = 1.0  # initial state in Krylov subspace
     evolved_state_krylov = expm(-1j * Tri * time) @ e1
     evolved_state = np.linalg.norm(initial_state) * np.array(V[:k]).T @ evolved_state_krylov
+
+    log.info(
+        "time_evolve_krylov: complete",
+        extra={"context": {
+            "evolved_state_norm": float(np.linalg.norm(evolved_state)),
+        }},
+    )
 
     # TODO: add logging and fail loud option for when krylov_dim is too small and the approximation is not accurate enough
     return evolved_state
@@ -135,6 +196,20 @@ def time_evolve_randomized_krylov(hamiltonian, initial_state, time, krylov_dim, 
     array-like
         The evolved state of the quantum system.
     """
+    log.info(
+        "time_evolve_randomized_krylov: starting",
+        extra={"context": {
+            "n_qubits": hamiltonian.num_qubits,
+            "matrix_dim": 2 ** hamiltonian.num_qubits,
+            "time": time,
+            "krylov_dim_requested": krylov_dim,
+            "num_random_vectors": num_random_vectors,
+        }},
+    )
+    log.warning(
+        "time_evolve_randomized_krylov: no random seed is passed/logged by this function; "
+        "runs using the global numpy RNG are not reproducible from this log alone"
+    )
 
     H = hamiltonian.to_matrix()
     v = initial_state / np.linalg.norm(initial_state)
@@ -142,6 +217,7 @@ def time_evolve_randomized_krylov(hamiltonian, initial_state, time, krylov_dim, 
 
     # Random matrix 
     S = np.random.randn(num_random_vectors, H.shape[0]) + 1j * np.random.randn(num_random_vectors, H.shape[0])
+    log.debug("time_evolve_randomized_krylov: sketch matrix drawn", extra={"context": {"S_shape": S.shape}})
     
     SV = [S @ v]  # list to store sketched Krylov vectors
 
@@ -170,7 +246,21 @@ def time_evolve_randomized_krylov(hamiltonian, initial_state, time, krylov_dim, 
         alphas.append(alpha_m)
         beta_m = np.linalg.norm(S_mat_vec_prod)
 
+        log.debug(
+            "time_evolve_randomized_krylov: iteration",
+            extra={"context": {
+                "iteration": m,
+                "alpha_m": complex(alpha_m),
+                "beta_m_sketch": float(beta_m),
+                "true_norm_before_normalize": float(np.linalg.norm(mat_vec_prod)),
+            }},
+        )
+
         if beta_m < 1e-12:
+            log.info(
+                "time_evolve_randomized_krylov: happy breakdown",
+                extra={"context": {"iteration": m, "beta_m": float(beta_m)}},
+            )
             break
 
         betas.append(beta_m)
@@ -182,11 +272,29 @@ def time_evolve_randomized_krylov(hamiltonian, initial_state, time, krylov_dim, 
     betas_for_tridiagonal = betas[:k-1] if k>1 else [] # fix: in case early break alphas different shape than betas
     Tri = np.diag(alphas) + np.diag(betas_for_tridiagonal, k=1) + np.diag(betas_for_tridiagonal, k=-1)
 
+    log.info(
+        "time_evolve_randomized_krylov: basis built",
+        extra={"context": {
+            "krylov_dim_requested": krylov_dim,
+            "num_random_vectors": num_random_vectors,
+            "k_reached": k,
+            "Tri_shape": Tri.shape,
+            "Tri_hermitian_deviation": float(np.max(np.abs(Tri - Tri.conj().T))),
+        }},
+    )
+
     # evolve in the Krylov subspace 
     e1 = np.zeros(k, dtype=complex)
     e1[0] = 1.0  # initial state in Krylov subspace
     evolved_state_krylov = expm(-1j * Tri * time) @ e1
     evolved_state = np.linalg.norm(initial_state) * np.array(V[:k]).T @ evolved_state_krylov
+
+    log.info(
+        "time_evolve_randomized_krylov: complete",
+        extra={"context": {
+            "evolved_state_norm": float(np.linalg.norm(evolved_state)),
+        }},
+    )
 
     # TODO: add logging and fail loud option for when krylov_dim is too small and the approximation is not accurate enough
     return evolved_state
