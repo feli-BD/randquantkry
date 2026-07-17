@@ -18,7 +18,7 @@ import numpy as np
 
 
 
-from utils.logging_config import get_logger
+from randquantkry.utils.logging_config import get_logger
 
 log = get_logger(__name__)
 
@@ -217,10 +217,6 @@ def time_evolve_randomized_krylov(hamiltonian, initial_state, time, krylov_dim, 
             "num_random_vectors": num_random_vectors,
         }},
     )
-    log.warning(
-        "time_evolve_randomized_krylov: no random seed is passed/logged by this function; "
-        "runs using the global numpy RNG are not reproducible from this log alone"
-    )
 
     H = hamiltonian.to_matrix(sparse=True)
     v = initial_state / np.linalg.norm(initial_state)
@@ -359,11 +355,6 @@ def time_evolve_randomized_krylov_gaussian(hamiltonian, initial_state, time, kry
             "num_random_vectors": num_random_vectors,
         }},
     )
-    log.warning(
-        "time_evolve_randomized_krylov: no random seed is passed/logged by this function; "
-        "runs using the global numpy RNG are not reproducible from this log alone"
-    )
-
     H = hamiltonian.to_matrix()
     v = initial_state / np.linalg.norm(initial_state)
     V = [v]  # list to store Krylov vectors
@@ -488,12 +479,8 @@ def time_evolve_randomized_krylov_gramschmidt(hamiltonian, initial_state, time, 
             "num_random_vectors": num_random_vectors,
         }},
     )
-    log.warning(
-        "time_evolve_randomized_krylov: no random seed is passed/logged by this function; "
-        "runs using the global numpy RNG are not reproducible from this log alone"
-    )
 
-    H = hamiltonian.to_matrix()
+    H = hamiltonian.to_matrix(sparse=True)
     v = initial_state / np.linalg.norm(initial_state)
     V = [v]  # list to store Krylov vectors
 

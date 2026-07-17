@@ -79,7 +79,19 @@ class JsonLinesFormatter(logging.Formatter):
             payload["exception"] = self.formatException(record.exc_info)
 
         return json.dumps(payload, default=str)
+class ConsoleContextFormatter(logging.Formatter):
+    """Human-readable formatter that appends any extra= context."""
 
+    def format(self, record: logging.LogRecord) -> str:
+        base = super().format(record)
+        extras = {
+            key: value
+            for key, value in record.__dict__.items()
+            if key not in _STANDARD_RECORD_ATTRS and not key.startswith("_")
+        }
+        if extras:
+            base += f" | {extras}"
+        return base
 
 def configure_logging(
     json_path: str | Path | None = None,
@@ -117,7 +129,7 @@ def configure_logging(
     console = logging.StreamHandler(stream=sys.stderr)
     console.setLevel(console_level)
     console.setFormatter(
-        logging.Formatter(
+        ConsoleContextFormatter(
             "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
             datefmt="%H:%M:%S",
         )
