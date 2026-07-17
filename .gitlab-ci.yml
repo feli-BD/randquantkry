@@ -13,7 +13,7 @@ test:
   image: python:3.12
   before_script:
     - pip install --upgrade pip
-    - pip install -e ".[dev]"
+    - pip install -e .
   script:
     - pytest --cov=rand_quantum_sim --cov=utils --cov-report=term-missing --cov-report=xml
   coverage: '/TOTAL.*\s+(\d+%)$/'
