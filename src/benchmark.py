@@ -151,17 +151,17 @@ class Benchmark:
                 else:
                     results[method] = {"state_norm": norm, "has_nan": has_nan, "passed": False}
  
-                    log.info("verify_consistency: method checked", extra={"context": {
-                        "method": method, "n_qubits": self.H.num_qubits, **{k: v for k, v in results[method].items()},
-                    }})
+                log.info("verify_consistency: method checked", extra={"context": {
+                    "method": method, "n_qubits": self.H.num_qubits, **{k: v for k, v in results[method].items()},
+                }})
             else: 
                 float("nan")
 
                 results[method] = {"state_norm": None, "has_nan": has_nan, "passed": False}
 
-                log.info("verify_consistency: method checked", extra={"context": {
-                    "method": method, "n_qubits": self.H.num_qubits, **{k: v for k, v in results[method].items()},
-                }})
+            log.info("verify_consistency: method checked", extra={"context": {
+                "method": method, "n_qubits": self.H.num_qubits, **{k: v for k, v in results[method].items()},
+            }})
 
         return results
 
@@ -304,3 +304,80 @@ class Benchmark:
         log.info("benchmark_memory: complete")
         return results
         
+
+    def benchmark(self, n_qubits_list, methods=None, empirical_memory=False):
+        """
+        Combined runtime + memory sweep. Runs each (n_qubits, method) point ONCE,
+        recording wall-clock runtime and theoretical memory always, plus
+        empirically-measured peak memory if empirical_memory=True.
+
+        Returns a single results dict compatible with BOTH plot_runtime(results)
+        and plot_memory(results) -- no need to run the sweep twice to get both plots.
+
+        NOTE: when empirical_memory=True, tracemalloc's own tracing overhead adds
+        a small, real bias to the measured runtime_sec for that run. If you need
+        a clean runtime number AND empirical memory, prefer two separate calls
+        (empirical_memory=False for timing, True for memory) rather than reading
+        runtime_sec from an empirical=True run.
+        """
+        methods = methods or self.methods
+        log.info("benchmark: starting", extra={"context": {
+            "n_qubits_list": list(n_qubits_list), "methods": methods,
+            "empirical_memory": empirical_memory,
+        }})
+
+        results = {method: {"n_qubits": [], "runtime_sec": [], "memory_gb": []} for method in methods}
+        if empirical_memory:
+            for m in methods:
+                results[m]["memory_gb_measured"] = []
+
+        for n_qubits in n_qubits_list:
+            hamiltonian, psi0, kdim, nrv = self._reconstruct(n_qubits)
+            n_terms = len(hamiltonian)
+
+            for method in methods:
+                results[method]["n_qubits"].append(n_qubits)
+
+                # --- theoretical memory: cheap, no computation needed ---
+                if method == "naive":
+                    est_gb = (2 ** n_qubits) ** 2 * 16 / 1e9
+                elif method == "krylov":
+                    est_gb = self.estimate_memory_gb(kdim, n_terms)["total_gb_deterministic"]
+                elif method in ("randomized_krylov", "randomized_krylov_gaussian"):
+                    est_gb = self.estimate_memory_gb(kdim, n_terms, nrv)["total_gb_randomized"]
+                elif method == "trotter":
+                    est_gb = (2 ** n_qubits * 16) / 1e9
+                else:
+                    est_gb = None
+                results[method]["memory_gb"].append(est_gb)
+
+                # --- single run: measures runtime, optionally wrapped in tracemalloc ---
+                try:
+                    if empirical_memory:
+                        tracemalloc.start()
+                        _, runtime = self._run_method(method, hamiltonian, psi0, kdim, nrv)
+                        _, peak = tracemalloc.get_traced_memory()
+                        tracemalloc.stop()
+                        results[method]["memory_gb_measured"].append(peak / 1e9)
+                    else:
+                        _, runtime = self._run_method(method, hamiltonian, psi0, kdim, nrv)
+
+                    results[method]["runtime_sec"].append(runtime)
+                    log.debug("benchmark: point", extra={"context": {
+                        "method": method, "n_qubits": n_qubits, "runtime_sec": runtime,
+                    }})
+
+                except Exception as e:
+                    log.warning("benchmark: method failed, recording None", extra={"context": {
+                        "method": method, "n_qubits": n_qubits, "error": str(e),
+                    }})
+                    results[method]["runtime_sec"].append(None)
+                    if empirical_memory:
+                        results[method]["memory_gb_measured"].append(None)
+                        try:
+                            tracemalloc.stop()  # in case it was left running after a mid-call failure
+                        except Exception:
+                            pass
+
+        log.info("benchmark: complete")
+        return results

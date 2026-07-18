@@ -29,13 +29,14 @@ seed = 67
 
 benchmark1 = Benchmark(hamiltonian, initial_state, time, krylov_dim, num_random_vectors, seed = seed)
 
-rt_results = Benchmark.benchmark_runtime(benchmark1, n_qubits_list=[ 20, 22, 24], methods=['randomized_krylov'])
+results = Benchmark.benchmark(benchmark1, n_qubits_list=[2, 4, 6, 8, 10, 12, 14, 16, 18, 20], methods=['naive', 'krylov', 'randomized_krylov'], empirical_memory = True)
 
-plot_runtime(rt_results)
+plot_runtime(results)
 
-mem_results = Benchmark.benchmark_memory(benchmark1, n_qubits_list=[ 20, 22, 24], methods=['randomized_krylov'], empirical = True)
+plot_memory(results,ram_limits={'Typical PC RAM: 16GB': 16, 'Typical HPC RAM: 512GB': 512}, empirical = True)
 
-plot_memory(
-    mem_results,
-    ram_limits={'Typical PC RAM: 16GB': 16, 'Typical HPC RAM: 512GB': 512}, empirical = True
-)
+# run only runtime or memory
+# rt_results = Benchmark.benchmark_runtime(benchmark1, n_qubits_list=[ 20, 22], methods=['randomized_krylov'])
+
+# mem_results = Benchmark.benchmark_memory(benchmark1, n_qubits_list=[ 20, 22], methods=['randomized_krylov'], empirical = True)
+
