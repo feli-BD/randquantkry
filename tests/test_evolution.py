@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from scipy.linalg import expm
 
-from rand_quantum_sim.evolution import (
+from randquantkry.evolution import (
     time_evolve_naive,
     time_evolve_krylov,
     time_evolve_randomized_krylov

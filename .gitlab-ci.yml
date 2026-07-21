@@ -15,8 +15,9 @@ cache:
     - .cache/pip
 
 .install: &install
-  - pip install --upgrade pip
-  - pip install -e ".[dev]"
+  - curl -LsSf https://astral.sh/uv/install.sh | sh
+  - export PATH="$HOME/.local/bin:$PATH"
+  - uv sync --extra dev --frozen
 
 # stage 1: check 
 sanity-check:
@@ -25,12 +26,8 @@ sanity-check:
   before_script:
     - *install
   script:
-    - python3 -c "import randquantkry; print('randquantkry imported ok, at', randquantkry.__file__)"
-    - python3 -c "
-      from randquantkry.hamiltonian import build_hamiltonian;
-      H = build_hamiltonian(2, [('X', 0, 1.0)]);
-      print('build_hamiltonian smoke test ok:', H)
-      "
+    - uv run python3 -c "import randquantkry; print('randquantkry imported ok, at', randquantkry.__file__)"
+    - uv run python3 -c "from randquantkry.hamiltonian import build_hamiltonian; H = build_hamiltonian(2, [('X', 0, 1.0)]); print('build_hamiltonian smoke test ok:', H)"
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_COMMIT_BRANCH == "main"'
@@ -43,12 +40,12 @@ unit-tests:
   before_script:
     - *install
   script:
-    - pytest --cov=randquantkry --cov-report=term-missing --cov-report=xml --junitxml=test-results.xml
+    - uv run pytest --cov=randquantkry --cov-report=term-missing --cov-report=xml --junitxml=test-results.xml
   coverage: '/TOTAL.*\s+(\d+%)$/'
   artifacts:
     when: always
     reports:
-      junit: test-results.xml            # shows pass/fail per-test in the MR view
+      junit: test-results.xml
       coverage_report:
         coverage_format: cobertura
         path: coverage.xml
@@ -70,7 +67,7 @@ unit-tests:
 #     - *install
 #   script:
 #     - mkdir -p results/verification
-#     - python3 -m scripts.run_verification
+#     - python3 -m test.run_verification
 #   artifacts:
 #     paths:
 #       - results/verification/
@@ -78,17 +75,20 @@ unit-tests:
 #   rules:
 #     - if: '$CI_COMMIT_BRANCH == "main"'
 
-# run-convergence-study:
-#   stage: study
+# run-validation-study:
+ #   stage: study
 #   image: python:3.12
 #   before_script:
 #     - *install
 #   script:
-#     - mkdir -p results/convergence
-#     - python3 -m scripts.run_convergence
+#     - mkdir -p results/verification
+#     - python3 -m tests.run_verification
 #   artifacts:
 #     paths:
-#       - results/convergence/
+#       - results/verification/
 #     expire_in: 1 month
 #   rules:
 #     - if: '$CI_COMMIT_BRANCH == "main"'
+
+
+# Stage 4: build documentation 

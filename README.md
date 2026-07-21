@@ -1,93 +1,189 @@
-# RandQuantKry
+# randquantkry
 
+**A RandNLA-accelerated Krylov subspace solver for quantum time evolution.**
 
+Simulating quantum dynamics classically hits an exponential wall: the state vector of an
+*n*-qubit system lives in a 2ⁿ-dimensional space, and exact methods scale accordingly. This
+project explores how far that wall can be pushed back using **randomized numerical linear
+algebra (RandLA)** combined with **Krylov subspace methods** — and, more specifically, *why*
+that reach is bounded by the same physics that governs the problem in the first place:
+[Lieb–Robinson bounds](https://en.wikipedia.org/wiki/Lieb%E2%80%93Robinson_bounds) limit how
+fast information spreads through a local Hamiltonian, which in turn sets how large a Krylov
+subspace is actually needed for a given system size and simulation time.
 
-## Getting started
+Rather than diagonalizing a dense N×N matrix (`naive`) or paying full O(m²N) reorthogonalization
+costs (`krylov`), this package builds Krylov subspaces using **sparse matrix-vector products**
+and a **fast randomized sketch** (Güttel & Schweitzer's sketched-FOM, with a truncated
+reorthogonalization made numerically safe by a periodic sketch-based correction). The result
+is a method that reaches the same accuracy at a fraction of the memory and, once system size
+and Krylov dimension are large enough, a fraction of the runtime too.
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+## Key features
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
-
-## Add your files
-
-* [Create](https://docs.gitlab.com/user/project/repository/web_editor/#create-a-file) or [upload](https://docs.gitlab.com/user/project/repository/web_editor/#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
-
-```
-cd existing_repo
-git remote add origin https://gitlab.git.nrw/felicia.erb/randquantkry.git
-git branch -M main
-git push -uf origin main
-```
-
-## Integrate with your tools
-
-* [Set up project integrations](https://gitlab.git.nrw/felicia.erb/randquantkry/-/settings/integrations)
-
-## Collaborate with your team
-
-* [Invite team members and collaborators](https://docs.gitlab.com/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/user/project/merge_requests/creating_merge_requests/)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/user/project/issues/managing_issues/#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
-
-## Test and Deploy
-
-Use the built-in continuous integration in GitLab.
-
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/topics/autodevops/requirements/)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ci/environments/protected_environments/)
-
-***
-
-# Editing this README
-
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
-
-## Suggestions for a good README
-
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
-
-## Name
-Choose a self-explaining name for your project.
-
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
-
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
-
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+- **Sparse Hamiltonian construction** (`hamiltonian.py`) — build arbitrary Pauli-string
+  Hamiltonians from a compact term list, with full input validation.
+- **Five time-evolution methods** (`evolution.py`, `trotter.py`):
+  - `naive` — exact diagonalization (ground truth, feasible only up to ~14 qubits)
+  - `krylov` — deterministic Lanczos, full reorthogonalization
+  - `randomized_krylov` — sketched Krylov (fast SRTT/DCT sketch, truncated reorthogonalization,
+    sketch-QR correction)
+  - `randomized_krylov_gaussian` — the same algorithm with a dense Gaussian sketch, kept as an
+    explicit comparison baseline (see *Known limitations* below)
+  - `trotter` — first/second-order Trotter-Suzuki product formula (via Qiskit), representing
+    what an actual quantum computer would run
+- **Benchmark suite** (`benchmark.py`, class `QuantumBenchmark`) — runtime and memory sweeps
+  across system size, plus a verification/validation split:
+  - `verify_consistency` — internal sanity checks (state norm ≈ 1, no NaN/Inf) that don't need
+    ground truth
+  - `validate_accuracy` — comparison against exact diagonalization or a self-convergence proxy
+    beyond the exact-diagonalization qubit limit
+- **Parameter study** (`parameter_study.py`) — a tidy `pandas`-based sweep across `n_qubits`,
+  `krylov_dim`, sketch-to-Krylov-dimension ratio, and evolution time, feeding directly into the
+  Lieb–Robinson analysis (minimal Krylov dimension `m*` needed for a target accuracy, as a
+  function of system size and time).
+- **Crash-safe, reproducible runs** (`utils/run_io.py`) — every parameter-study run writes its
+  configuration, package versions, and results incrementally to disk, so a crash partway through
+  a long sweep doesn't lose what was already computed.
+- **CI/CD** — GitLab pipeline with a fast import sanity check, the full `pytest` suite with
+  coverage, and longer verification/convergence studies gated to `main`. Testable locally before
+  every push with [`gitlab-ci-local`](https://github.com/firecow/gitlab-ci-local).
 
 ## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+This project uses [`uv`](https://github.com/astral-sh/uv) for fast, reproducible dependency
+management.
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+```bash
+git clone <repo-url>
+cd randquantkry
+uv sync --extra dev
+```
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+That's it — `uv` reads `pyproject.toml` and the committed `uv.lock`, and installs an
+environment that exactly matches what CI runs.
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+If you'd rather use plain `pip`:
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+```bash
+python -m venv .venv
+source .venv/bin/activate      # Windows: .venv\Scripts\activate
+pip install -e ".[dev]"
+```
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+## Quick start
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+### Running the benchmark suite from the command line
+
+```bash
+uv run python -m scripts.benchmarking \
+    --n-qubits 6 8 10 12 \
+    --krylov-dim 20 \
+    --num-random-vectors 41 \
+    --time 0.5 \
+    --methods krylov randomized_krylov
+```
+
+`Benchmark` takes a single reference `hamiltonian`/`initial_state`; the script builds one at
+your first `--n-qubits` value and resizes it internally (via `reconstruct_hamiltonian`) for
+every other size in the sweep. See `scripts/benchmarking.py --help` for all options.
+
+### Running a parameter study
+
+```bash
+uv run python -m scripts.parameter_studying \
+    --n-qubits 8 10 12 \
+    --krylov-dim 10 20 40 \
+    --s-ratio 1.5 2.0 3.0 \
+    --time 0.5 1.0 \
+    --methods krylov randomized_krylov \
+    --output-dir results
+```
+
+Sweeps `n_qubits × krylov_dim × sketch-to-Krylov-dimension ratio × time`, writing results
+**incrementally** to `results/run_<timestamp>/results.jsonl` as each point is computed (see
+`utils/run_io.py`) — if the sweep is interrupted or crashes partway through, everything
+computed so far is still on disk and loadable, along with a `metadata.json` recording the
+exact configuration and package versions used, for reproducibility.
+
+### Interactive walkthrough
+
+For a guided, notebook-style introduction to the package — building a Hamiltonian, running each
+evolution method, comparing accuracy and speed — see **`scripts/tutorial.ipynb`**. It's the
+recommended starting point if you're new to the codebase, since it walks through the reasoning
+behind each method rather than just the API.
+
+## Project structure
+
+```
+randquantkry/
+├── src/randquantkry/
+│   ├── hamiltonian.py       # Pauli-string Hamiltonian construction + resizing
+│   ├── evolution.py         # naive, krylov, randomized_krylov(_gaussian)
+│   ├── trotter.py           # Trotter-Suzuki product formula (via Qiskit)
+│   ├── benchmark.py         # Benchmark: runtime/memory sweeps, verify/validate, parameter_study
+│   ├── plotting.py          # consistent styling across all result plots
+│   └── utils/
+│       ├── logging_config.py     # structured console + JSON-lines logging
+│       ├── memory_estimate.py    # analytical memory prediction before running
+│       ├── convergence_check.py  # self-convergence ground-truth proxy
+│       └── run_io.py             # crash-safe, reproducible run persistence
+├── scripts/
+│   ├── benchmarking.py       # CLI: runtime/memory benchmark
+│   ├── parameter_studying.py # CLI: multi-factor parameter study
+│   └── tutorial.ipynb        # interactive walkthrough
+├── tests/                     # pytest suite (hamiltonian, evolution, benchmark, verification)
+├── results/                    # timestamped parameter-study output (gitignored, see run_io.py)
+├── pyproject.toml
+├── uv.lock
+└── .gitlab-ci.yml
+```
+
+## Testing
+
+```bash
+uv run pytest --cov=randquantkry
+```
+
+To test the CI pipeline itself locally before pushing (catches YAML/config issues without
+waiting for a real pipeline run):
+
+```bash
+gitlab-ci-local              # full pipeline
+gitlab-ci-local unit-tests   # a single job
+```
+
+## Known limitations
+
+Being upfront about these, since they came out of real debugging during development:
+
+- **`trotter` is not ground truth.** It's a genuine approximation method (converging to the
+  exact result as `num_steps` grows), included specifically because it's the algorithm real
+  quantum hardware runs — not because it's exact. `validate_accuracy` will flag this explicitly
+  when Trotter is used as the comparison baseline above the exact-diagonalization qubit limit.
+- **`num_random_vectors` must exceed `krylov_dim`** (roughly `2*krylov_dim + 1`) for the
+  sketch-QR correction to be well-defined, and can never exceed `2**n_qubits`. Both `krylov_dim`
+  and `num_random_vectors` are automatically clamped with a logged warning if a sweep would
+  otherwise request something outside this range.
+- **`randomized_krylov_gaussian` is a deliberate baseline, not a recommended method.** It uses a
+  dense Gaussian sketch instead of the fast SRTT/DCT sketch — theoretically similar accuracy,
+  but with a genuinely worse memory footprint (O(s·N) for the sketch matrix itself) and, once
+  `H` is sparse, no real speed advantage over deterministic Krylov. Kept for comparison, not
+  for production use.
+- **Memory grows with both `n_qubits` and `krylov_dim`.** Use
+  `utils.memory_estimate.estimate_memory_gb` to check feasibility *before* running a large sweep,
+  not after.
+
+## References
+
+This implementation is built directly on:
+
+- Güttel, S., & Schweitzer, M. (2023). *Randomized sketching for Krylov approximations of
+  large-scale matrix functions.* SIAM Journal on Matrix Analysis and Applications.
+- Balabanov, O., & Grigori, L. (2022). *Randomized Gram-Schmidt process with application to GMRES.*
+- Martinsson, P.-G., & Tropp, J. A. (2020). *Randomized numerical linear algebra: Foundations
+  and algorithms.* Acta Numerica.
+- Tropp, J. A. (2011). *Improved analysis of the subsampled randomized Hadamard transform.*
 
 ## License
-For open source projects, say how it is licensed.
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+MIT — see `LICENSE`.
