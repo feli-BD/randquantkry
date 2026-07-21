@@ -17,10 +17,11 @@ from scipy.fft import dct
 import numpy as np
 
 
-
 from randquantkry.utils.logging_config import get_logger
 
 log = get_logger(__name__)
+
+MAX_NAIVE_QUBITS = 12
 
 def time_evolve_naive(hamiltonian, initial_state, time):
     """

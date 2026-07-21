@@ -9,12 +9,14 @@
 from time import perf_counter
 import numpy as np
 import tracemalloc
+import pandas as pd
  
 from .evolution import (
     time_evolve_naive,
     time_evolve_krylov,
     time_evolve_randomized_krylov,
     time_evolve_randomized_krylov_gaussian,
+    MAX_NAIVE_QUBITS,
 )
 
 from .hamiltonian import build_hamiltonian, reconstruct_hamiltonian, build_initial_state
@@ -24,7 +26,6 @@ from randquantkry.utils.logging_config import get_logger
 log = get_logger(__name__)
 
 ALL_METHODS = ("naive", "krylov", "randomized_krylov", "randomized_krylov_gaussian", "trotter")
-MAX_NAIVE_QUBITS = 12
 
 class Benchmark:
     """
@@ -102,7 +103,7 @@ class Benchmark:
             nrv = N
         return nrv
 
-    def _reconstruct(self, n_qubits):
+    def _reconstruct_hamiltonian(self, n_qubits):
         """Construct everything needed for one n_qubits point: Hamiltonian,
         initial state, and resolved krylov_dim/num_random_vectors."""
         hamiltonian = reconstruct_hamiltonian(n_qubits, self.H)
@@ -112,25 +113,25 @@ class Benchmark:
         return hamiltonian, psi0, kdim, nrv
 
 
-    def _run_method(self, method, hamiltonian, initial_state, kdim, nrv):
+    def _run_method(self, method, hamiltonian, initial_state, time, kdim, nrv=None):
         """Run a single method, returning (state, runtime_sec). Raises
         whatever the underlying method raises (e.g. ValueError above
         MAX_QUBITS_DENSE) -- callers decide how to handle that."""
         t0 = perf_counter()
         if method == "naive":
             if hamiltonian.num_qubits <= MAX_NAIVE_QUBITS:
-                unitary, state = time_evolve_naive(hamiltonian, initial_state, self.time)
+                unitary, state = time_evolve_naive(hamiltonian, initial_state, time)
             else:
                 log.info(" 'naive' skipped to prevent memory overload due to too many qubits: ", extra={"context": {
                         "n_qubits": self.H.num_qubits }} )
         elif method == "krylov":
-            state = time_evolve_krylov(hamiltonian, initial_state, self.time, kdim)
+            state = time_evolve_krylov(hamiltonian, initial_state, time, kdim)
         elif method == "randomized_krylov":
-            state = time_evolve_randomized_krylov(hamiltonian, initial_state, self.time, kdim, nrv, seed=self.seed)
+            state = time_evolve_randomized_krylov(hamiltonian, initial_state, time, kdim, nrv, seed=self.seed)
         elif method == "randomized_krylov_gaussian":
-            state = time_evolve_randomized_krylov_gaussian(hamiltonian, initial_state, self.time, kdim, nrv, seed=self.seed)
+            state = time_evolve_randomized_krylov_gaussian(hamiltonian, initial_state, time, kdim, nrv, seed=self.seed)
         elif method == "trotter":
-            state = time_evolve_trotter(hamiltonian, initial_state, self.time, **self.trotter_kwargs)
+            state = time_evolve_trotter(hamiltonian, initial_state, time, **self.trotter_kwargs)
         else:
             raise ValueError(f"Unknown method {method!r}")
         runtime = perf_counter() - t0
@@ -142,7 +143,7 @@ class Benchmark:
         # randomized_krylov -> krylov as num_random_vectors grows large
         results = {}
         for method in methods or self.methods:
-            state, runtime = self._run_method(method, self.H, self.initial_state, self.krylov_dim, self.num_random_vectors)
+            state, runtime = self._run_method(method, self.H, self.initial_state, self.time, self.krylov_dim, self.num_random_vectors)
             has_nan = bool(np.any(np.isnan(state)) or np.any(np.isinf(state)))
             if not has_nan:
                 norm = float(np.linalg.norm(state))
@@ -192,7 +193,7 @@ class Benchmark:
                 results[method] = {"rel_error": 0.0, "ground_truth": ground_truth_kind}
                 continue
             try:
-                state, _ = self._run_method(method, self.H, self.initial_state, self.krylov_dim, self.num_random_vectors)
+                state, _ = self._run_method(method, self.H, self.initial_state, self.time, self.krylov_dim, self.num_random_vectors)
                 rel_error = float(np.linalg.norm(state - exact_state) / exact_norm)
                 results[method] = {"rel_error": rel_error, "ground_truth": ground_truth_kind}
             except Exception as e:
@@ -212,11 +213,11 @@ class Benchmark:
         results = { method: {"n_qubits": [], "runtime_sec": []} for method in methods }
 
         for n_qubits in n_qubits_list:
-            hamiltonian, psi0, kdim, nrv = self._reconstruct(n_qubits)
+            hamiltonian, psi0, kdim, nrv = self._reconstruct_hamiltonian(n_qubits)
             for method in methods:
                 results[method]["n_qubits"].append(n_qubits)
                 try:
-                    exact_state, runtime = self._run_method(method, hamiltonian, psi0, kdim, nrv)
+                    exact_state, runtime = self._run_method(method, hamiltonian, psi0, kdim)
                     results[method]["runtime_sec"].append(runtime)
                     log.debug("benchmark_runtime: point", extra={"context": {
                         "method": method, "n_qubits": n_qubits, "runtime_sec": runtime,
@@ -264,7 +265,7 @@ class Benchmark:
 
         # theoretical calcualtes memory usage
         for n_qubits in n_qubits_list:
-            hamiltonian, psi0, kdim, nrv = self._reconstruct(n_qubits)
+            hamiltonian, psi0, kdim, nrv = self._reconstruct_hamiltonian(n_qubits)
             n_terms = len(hamiltonian)
  
             for method in methods:
@@ -291,7 +292,7 @@ class Benchmark:
                 if empirical:
                     try:
                         tracemalloc.start()
-                        self._run_method(method, hamiltonian, psi0, kdim, nrv)
+                        self._run_method(method, hamiltonian, psi0, self.time, kdim, nrv)
                         _, peak = tracemalloc.get_traced_memory()
                         tracemalloc.stop()
                         results[method]["memory_gb_measured"].append(peak / 1e9)
@@ -326,13 +327,13 @@ class Benchmark:
             "empirical_memory": empirical_memory,
         }})
 
-        results = {method: {"n_qubits": [], "runtime_sec": [], "memory_gb": []} for method in methods}
+        results = {method: {"n_qubits": [], "state": [], "runtime_sec": [], "memory_gb": []} for method in methods}
         if empirical_memory:
             for m in methods:
                 results[m]["memory_gb_measured"] = []
 
         for n_qubits in n_qubits_list:
-            hamiltonian, psi0, kdim, nrv = self._reconstruct(n_qubits)
+            hamiltonian, psi0, kdim, nrv = self._reconstruct_hamiltonian(n_qubits)
             n_terms = len(hamiltonian)
 
             for method in methods:
@@ -355,14 +356,15 @@ class Benchmark:
                 try:
                     if empirical_memory:
                         tracemalloc.start()
-                        _, runtime = self._run_method(method, hamiltonian, psi0, kdim, nrv)
+                        state, runtime = self._run_method(method, hamiltonian, psi0, self.time, kdim, nrv)
                         _, peak = tracemalloc.get_traced_memory()
                         tracemalloc.stop()
                         results[method]["memory_gb_measured"].append(peak / 1e9)
                     else:
-                        _, runtime = self._run_method(method, hamiltonian, psi0, kdim, nrv)
+                        _, runtime = self._run_method(method, hamiltonian, psi0, self.time, kdim, nrv)
 
                     results[method]["runtime_sec"].append(runtime)
+                    results[method]["state"].append(state)
                     log.debug("benchmark: point", extra={"context": {
                         "method": method, "n_qubits": n_qubits, "runtime_sec": runtime,
                     }})
@@ -381,3 +383,83 @@ class Benchmark:
 
         log.info("benchmark: complete")
         return results
+    
+    def parameter_study(self, n_qubits_list, krylov_dim_list, s_ratio_list, time_list,
+                              methods=("krylov", "randomized_krylov"), seed=67,
+                              accuracy_convergence_dims=None):
+        
+        rows = []
+        total_points = len(n_qubits_list) * len(krylov_dim_list) * len(time_list)
+        log.info("run_parameter_study: starting", extra={"context": {
+            "n_qubits_list": list(n_qubits_list), "krylov_dim_list": list(krylov_dim_list),
+            "s_ratio_list": list(s_ratio_list), "time_list": list(time_list),
+            "methods": list(methods), "total_base_points": total_points,
+        }})
+
+        for n_qubits in n_qubits_list:
+            hamiltonian, psi0, kdim, nrv = self._reconstruct_hamiltonian(n_qubits)
+            n_terms = len(hamiltonian)
+            N = 2 ** n_qubits
+
+            for time in time_list:
+                
+                if n_qubits <= MAX_NAIVE_QUBITS:
+                    _, exact_state = time_evolve_naive(hamiltonian, psi0, time)
+                    ground_truth_kind = "exact"
+                    exact_norm = np.linalg.norm(exact_state)
+                elif accuracy_convergence_dims is not None:
+                    # TODO implement
+                    ground_truth_kind = "self_convergence"
+                    # exact_norm = np.linalg.norm(exact_state)
+
+                elif "trotter" in methods:
+                    num_steps, order = self.trotter_kwargs['num_steps'], self.trotter_kwargs['order']
+                    exact_state = time_evolve_trotter(hamiltonian, psi0, time, num_steps, order)
+                    ground_truth_kind = "trotter"
+                    exact_norm = np.linalg.norm(exact_state)
+
+                else:
+                    exact_state = None
+                    ground_truth_kind = None
+
+                for krylov_dim in krylov_dim_list:
+                    if krylov_dim >= N:
+                        log.warning("run_parameter_study: skipping krylov_dim >= N", extra={"context": {
+                            "n_qubits": n_qubits, "krylov_dim": krylov_dim, "N": N,
+                        }})
+                        continue    
+
+                    if "krylov" in methods:
+                        tracemalloc.start()
+                        state, runtime = self._run_method("krylov", hamiltonian, psi0, self.time, krylov_dim, nrv)
+                        _, peak = tracemalloc.get_traced_memory()
+                        tracemalloc.stop()  
+                        mem = (peak / 1e9)                          
+                        rel_error = (float(np.linalg.norm(state - exact_state) / exact_norm) if exact_state is not None else None)
+                        rows.append({
+                            "n_qubits": n_qubits, "krylov_dim": krylov_dim, "s_ratio": None,
+                            "num_random_vectors": None, "time": time, "method": "krylov",
+                            "runtime_sec": runtime, "memory_gb": mem, "rel_error": rel_error,
+                            "ground_truth": ground_truth_kind,
+                            })
+                    
+                    if "randomized_krylov" in methods:
+                        for s_ratio in s_ratio_list:
+                            s = int(np.ceil(s_ratio * krylov_dim))
+                            if s >= N:
+                                continue
+                            tracemalloc.start()
+                            state, runtime = self._run_method("randomized_krylov", hamiltonian, psi0, self.time, krylov_dim, s)
+                            _, peak = tracemalloc.get_traced_memory()
+                            tracemalloc.stop()
+                            mem = peak / 1e9
+                            rel_error = (float(np.linalg.norm(state - exact_state) / exact_norm) if exact_state is not None else None)
+                            rows.append({
+                                "n_qubits": n_qubits, "krylov_dim": krylov_dim, "s_ratio": s_ratio,
+                                "num_random_vectors": s, "time": time, "method": "randomized_krylov",
+                                "runtime_sec": runtime, "memory_gb": mem, "rel_error": rel_error,
+                                "ground_truth": ground_truth_kind,
+                            })
+
+        log.info("run_parameter_study: complete", extra={"context": {"n_rows": len(rows)}})
+        return pd.DataFrame(rows)

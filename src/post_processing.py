@@ -144,3 +144,74 @@ def plot_memory(results, methods=None, ram_limits=None,
         plt.show()
 
     return fig
+
+import matplotlib.pyplot as plt
+import pandas as pd
+import numpy as np
+
+
+def plot_parameter_study(df, x="krylov_dim", y="runtime_sec", fixed=None, hue="method", save_path=None):
+    """
+    Plot y vs x from a parameter_study() results DataFrame, one line per
+    distinct value of `hue`, after filtering to a fixed slice.
+
+    Two automatic safeguards, based on lessons from earlier plots:
+
+    1. If hue="method" and x is NOT "s_ratio": rows that share a method but
+       differ in s_ratio (e.g. randomized_krylov at s_ratio=1.5, 2.0, 3.0)
+       would otherwise collapse into one jagged, meaningless line. This
+       auto-builds a combined label ("randomized_krylov (s_ratio=2.0)") so
+       each sketch size gets its own clean line instead.
+
+    2. If x == "s_ratio": rows with no meaningful s_ratio (e.g. plain
+       "krylov", which has s_ratio=None/NaN) are dropped automatically,
+       since they'd otherwise contribute a stray single point or a NaN gap.
+       hue is forced to "method" in this case (using it as both x and hue
+       would create one-point "lines" with nothing to connect).
+    """
+    data = df.copy()
+    if fixed:
+        for col, val in fixed.items():
+            data = data[data[col] == val]
+    if data.empty:
+        raise ValueError(f"No rows match fixed={fixed} -- check your filter values against df's actual contents.")
+
+    if x == "s_ratio":
+        # rows without a real s_ratio (e.g. plain "krylov") can't sit on this x-axis at all
+        data = data.dropna(subset=["s_ratio"])
+        if data.empty:
+            raise ValueError("No rows have a non-null s_ratio after filtering -- did you mean to include 'krylov'?")
+        hue_col = "method"   # using s_ratio as both x and hue would give one-point "lines"
+    elif hue == "method" and "s_ratio" in data.columns:
+        def make_label(row):
+            if pd.isna(row["s_ratio"]):
+                return row["method"]
+            return f"{row['method']} (s_ratio={row['s_ratio']})"
+        data["_hue_label"] = data.apply(make_label, axis=1)
+        hue_col = "_hue_label"
+    else:
+        hue_col = hue
+
+    fig, ax = plt.subplots(figsize=(7.5, 5.5))
+    for hue_val, group in data.groupby(hue_col):
+        group_sorted = group.sort_values(x)
+        ax.plot(group_sorted[x], group_sorted[y], marker="o", label=str(hue_val), linewidth=2)
+
+    if y in ("runtime_sec", "memory_gb"):
+        ax.set_yscale("log")
+
+    ax.set_xlabel(x, fontsize=12)
+    ax.set_ylabel(y, fontsize=12)
+    title = f"{y} vs {x}" + (f"  (fixed: {fixed})" if fixed else "")
+    ax.set_title(title, fontsize=13, fontweight="bold")
+    ax.legend(fontsize=10)
+    ax.grid(alpha=0.3)
+    plt.tight_layout()
+
+    if save_path:
+        plt.savefig(save_path, dpi=150, bbox_inches="tight")
+        plt.close(fig)
+    else:
+        plt.show()
+
+    return fig
