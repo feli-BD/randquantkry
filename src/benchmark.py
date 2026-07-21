@@ -146,7 +146,9 @@ class Benchmark:
         # randomized_krylov -> krylov as num_random_vectors grows large
         results = {}
         for method in methods or self.methods:
-            state, runtime = self._run_method(method, self.H, self.initial_state, self.time, self.krylov_dim, self.num_random_vectors)
+            kdim = self._resolve_krylov_dim(self.H.num_qubits)
+            nrv = self._resolve_num_random_vectors(kdim, self.H.num_qubits)
+            state, runtime = self._run_method(method, self.H, self.initial_state, self.time, kdim, nrv)
             has_nan = bool(np.any(np.isnan(state)) or np.any(np.isinf(state)))
             if not has_nan:
                 norm = float(np.linalg.norm(state))
@@ -186,9 +188,9 @@ class Benchmark:
             # exact_norm = np.linalg.norm(exact_state)
             # ground_truth_kind = "self_convergence"
 
-            trotter_state = time_evolve_trotter(self.H, self.initial_state, self.time, **self.trotter_kwargs)
+            exact_state = time_evolve_trotter(self.H, self.initial_state, self.time, **self.trotter_kwargs)
             ground_truth_kind = "trotter"
-            exact_norm = np.linalg.norm(trotter_state)
+            exact_norm = np.linalg.norm(exact_state)
         
         results = {}
         for method in methods or self.methods:
@@ -196,7 +198,9 @@ class Benchmark:
                 results[method] = {"rel_error": 0.0, "ground_truth": ground_truth_kind}
                 continue
             try:
-                state, _ = self._run_method(method, self.H, self.initial_state, self.time, self.krylov_dim, self.num_random_vectors)
+                kdim = self._resolve_krylov_dim(self.H.num_qubits)
+                nrv = self._resolve_num_random_vectors(kdim, self.H.num_qubits)
+                state, runtime = self._run_method(method, self.H, self.initial_state, self.time, kdim, nrv)
                 rel_error = float(np.linalg.norm(state - exact_state) / exact_norm)
                 results[method] = {"rel_error": rel_error, "ground_truth": ground_truth_kind}
             except Exception as e:
@@ -220,7 +224,7 @@ class Benchmark:
             for method in methods:
                 results[method]["n_qubits"].append(n_qubits)
                 try:
-                    exact_state, runtime = self._run_method(method, hamiltonian, psi0, kdim)
+                    exact_state, runtime = self._run_method(method, hamiltonian, psi0, self.time, kdim)
                     results[method]["runtime_sec"].append(runtime)
                     log.debug("benchmark_runtime: point", extra={"context": {
                         "method": method, "n_qubits": n_qubits, "runtime_sec": runtime,
@@ -342,7 +346,7 @@ class Benchmark:
             for method in methods:
                 results[method]["n_qubits"].append(n_qubits)
 
-                # --- theoretical memory: cheap, no computation needed ---
+                # theoretical memory: cheap, no computation needed 
                 if method == "naive":
                     est_gb = (2 ** n_qubits) ** 2 * 16 / 1e9
                 elif method == "krylov":
@@ -355,7 +359,7 @@ class Benchmark:
                     est_gb = None
                 results[method]["memory_gb"].append(est_gb)
 
-                # --- single run: measures runtime, optionally wrapped in tracemalloc ---
+                # single run: measures runtime, optionally wrapped in tracemalloc 
                 try:
                     if empirical_memory:
                         tracemalloc.start()

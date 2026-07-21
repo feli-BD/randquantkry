@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from rand_quantum_sim.hamiltonian import build_hamiltonian
+from randquantkry.hamiltonian import build_hamiltonian
 
 
 def test_build_hamiltonian_matches_intuitive_tensor_product():
