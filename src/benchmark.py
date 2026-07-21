@@ -21,7 +21,9 @@ from .evolution import (
 
 from .hamiltonian import build_hamiltonian, reconstruct_hamiltonian, build_initial_state
 from .trotter import time_evolve_trotter
-from randquantkry.utils.logging_config import get_logger
+from randquantkry.utils.logging_config import get_logger, configure_logging
+from randquantkry.utils.reproducible_runs import start_run, append_result_row
+
  
 log = get_logger(__name__)
 
@@ -63,7 +65,7 @@ class Benchmark:
 
     def __init__(self, hamiltonian, initial_state, time,
                  krylov_dim, num_random_vectors=None, methods=None,
-                 trotter_kwargs=None, seed=None):
+                 trotter_kwargs=None, seed=None, output_dir="results"):
         self.H = hamiltonian
         self.initial_state = initial_state
         self.time = time
@@ -75,6 +77,7 @@ class Benchmark:
             raise ValueError(f"Unknown method(s) {sorted(unknown)}; valid options are {ALL_METHODS}")
         self.trotter_kwargs = trotter_kwargs or {"num_steps": 100, "order": 1}
         self.seed = seed
+        self.output_dir = output_dir
 
     def _resolve_krylov_dim(self, n_qubits):
         N = 2 ** n_qubits
@@ -387,10 +390,23 @@ class Benchmark:
     def parameter_study(self, n_qubits_list, krylov_dim_list, s_ratio_list, time_list,
                               methods=("krylov", "randomized_krylov"), seed=67,
                               accuracy_convergence_dims=None):
-        
+        # set up storing results
+        run_config = {
+        "n_qubits_list": list(n_qubits_list),
+        "krylov_dim_list": list(krylov_dim_list),
+        "s_ratio_list": list(s_ratio_list),
+        "time_list": list(time_list),
+        "methods": list(methods),
+        "seed": seed,
+        }
+
+        run_dir = start_run(self.output_dir, run_config)
+
+        configure_logging(json_path=run_dir / "run.log.jsonl", console_level="INFO")
+
         rows = []
         total_points = len(n_qubits_list) * len(krylov_dim_list) * len(time_list)
-        log.info("run_parameter_study: starting", extra={"context": {
+        log.info("run_parameter_study: starting", extra={"context": {"run_dir": str(run_dir),
             "n_qubits_list": list(n_qubits_list), "krylov_dim_list": list(krylov_dim_list),
             "s_ratio_list": list(s_ratio_list), "time_list": list(time_list),
             "methods": list(methods), "total_base_points": total_points,
@@ -436,12 +452,15 @@ class Benchmark:
                         tracemalloc.stop()  
                         mem = (peak / 1e9)                          
                         rel_error = (float(np.linalg.norm(state - exact_state) / exact_norm) if exact_state is not None else None)
-                        rows.append({
+                        evolved_state_norm = float(np.linalg.norm(state))
+                        row = {
                             "n_qubits": n_qubits, "krylov_dim": krylov_dim, "s_ratio": None,
                             "num_random_vectors": None, "time": time, "method": "krylov",
                             "runtime_sec": runtime, "memory_gb": mem, "rel_error": rel_error,
-                            "ground_truth": ground_truth_kind,
-                            })
+                            "evolved_state_norm": evolved_state_norm, "ground_truth": ground_truth_kind,
+                            }
+                        rows.append(row)
+                        append_result_row(run_dir, row) 
                     
                     if "randomized_krylov" in methods:
                         for s_ratio in s_ratio_list:
@@ -454,12 +473,14 @@ class Benchmark:
                             tracemalloc.stop()
                             mem = peak / 1e9
                             rel_error = (float(np.linalg.norm(state - exact_state) / exact_norm) if exact_state is not None else None)
-                            rows.append({
+                            row = {
                                 "n_qubits": n_qubits, "krylov_dim": krylov_dim, "s_ratio": s_ratio,
                                 "num_random_vectors": s, "time": time, "method": "randomized_krylov",
                                 "runtime_sec": runtime, "memory_gb": mem, "rel_error": rel_error,
-                                "ground_truth": ground_truth_kind,
-                            })
+                                "evolved_state_norm": evolved_state_norm,  "ground_truth": ground_truth_kind,
+                            }
+                            rows.append(row)
+                            append_result_row(run_dir, row)
 
-        log.info("run_parameter_study: complete", extra={"context": {"n_rows": len(rows)}})
-        return pd.DataFrame(rows)
+        log.info("parameter_study: complete", extra={"context": {"n_rows": len(rows), "run_dir": str(run_dir)}})
+        return pd.DataFrame(rows), run_dir
