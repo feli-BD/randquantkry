@@ -139,11 +139,84 @@ class Benchmark:
             raise ValueError(f"Unknown method {method!r}")
         runtime = perf_counter() - t0
         return state, runtime
-      
+
+    import numpy as np
+
+
+    def find_converged_krylov_dim(evolve_fn, hamiltonian, initial_state, time,
+                                krylov_dims=[10, 20, 40, 80, 160], tol=1e-6, **evolve_kwargs):
+        """
+        Find the smallest krylov_dim (from a candidate list) at which the
+        evolved state stops changing beyond `tol`, WITHOUT needing exact ground
+        truth. Use this beyond ~14 qubits, where time_evolve_naive is no longer
+        feasible.
+
+        Parameters
+        ----------
+        evolve_fn : callable
+            time_evolve_krylov or time_evolve_randomized_krylov (or any function
+            with the same (hamiltonian, initial_state, time, krylov_dim, ...) signature).
+        krylov_dims : sorted list of int
+            Increasing candidate values to try, e.g. [10, 20, 40, 80, 160].
+        tol : float
+            Convergence threshold on ||state_m - state_{m_prev}|| / ||state_m||.
+        evolve_kwargs : dict
+            Extra keyword arguments passed through to evolve_fn (e.g.
+            num_random_vectors=..., trunc=..., seed=...).
+
+        Returns
+        -------
+        dict with:
+            "converged_at" : the krylov_dim where convergence was first detected
+                            (or None if never converged within the given list),
+            "diffs" : list of successive relative differences (for plotting),
+            "states" : list of the evolved states at each krylov_dim tried.
+        """
+        states = []
+        diffs = []
+        converged_at = None
+
+        for m in krylov_dims:
+            state = evolve_fn(hamiltonian, initial_state, time, m, **evolve_kwargs)
+            states.append(state)
+
+            if len(states) > 1:
+                diff = np.linalg.norm(states[-1] - states[-2]) / np.linalg.norm(states[-1])
+                diffs.append(float(diff))
+                if diff < tol and converged_at is None:
+                    converged_at = m
+
+        return {
+            "converged_at": converged_at,
+            "diffs": diffs,
+            "krylov_dims_tried": list(krylov_dims),
+            "states": states,
+        }
+        
     # verification: internal consistency, no ground truth needed
     def verify_consistency(self,  methods=None):
-        # checks per method: state_norm ≈ 1, no NaN/Inf, Tri Hermitian (where applicable),
-        # randomized_krylov -> krylov as num_random_vectors grows large
+        """Perform basic internal consistency checks across selected methods without requiring ground truth.
+
+        Checks performed per method:
+        - Absence of NaN or Infinite values in the evolved state vector.
+        - Conservation of probability density (state norm ≈ 1.0).
+
+        Parameters
+        ----------
+        methods : list of str, optional
+            Subset of methods to verify. Defaults to `self.methods`.
+
+        Returns
+        -------
+        dict
+            A dictionary mapping method names to their check results, containing:
+            - "state_norm": float or None
+                The L2 norm of the evolved state vector.
+            - "has_nan": bool
+                True if NaNs or Infs were detected in the vector.
+            - "passed": bool
+                True if the state passed all sanity checks (no NaNs and norm ≈ 1.0).
+        """
         results = {}
         for method in methods or self.methods:
             state, runtime = self._run_method(method, self.H, self.initial_state, self.time, self.krylov_dim, self.num_random_vectors)
@@ -171,24 +244,53 @@ class Benchmark:
 
     # Validation & Verification
     # validation: compare against ground truth, trotter and self-convergence
-    def validate_accuracy(self, methods=None):
-        # rel_error vs exact (≤14 qubits) or self-convergence proxy beyond that
+    def validate_accuracy(self, convergence_dims=[10, 20, 40, 80, 160], tol=1e-6, methods=['randomized_krylov']):
+        """Validate accuracy of quantum evolution methods against a baseline ground truth.
+
+        The ground truth reference depends on system size:
+        - Systems <= 10 qubits: Evaluated against full exact time evolution (`naive`).
+        - Systems > 10 qubits: Evaluated against a self-convergence proxy state computed via
+          a large-subspace Krylov method (`self_convergence`).
+
+        Parameters
+        ----------
+        convergence_dims : list of int, default=[10, 20, 40, 80, 160]
+            List of increasing Krylov subspace dimensions used to compute the
+            self-convergence baseline when exact diagonalisation is unavailable.
+        tol : float, optional
+            Tolerance threshold passed to the convergence solver.
+        methods : list of str, optional
+            Subset of methods to validate. Defaults to `self.methods`.
+
+        Returns
+        -------
+        dict
+            A dictionary mapping method names to validation metrics:
+            - "rel_error": float or None
+                Relative error with respect to the ground truth reference.
+            - "ground_truth": str
+                Type of reference used ("exact" or "self_convergence").
+            - "error": str, optional
+                Error message string if execution failed.
+        """
 
         if self.H.num_qubits <= 10:
             unitary, exact_state = time_evolve_naive(self.H, self.initial_state, self.time)   # real ground truth
             ground_truth_kind = "exact"
             exact_norm = np.linalg.norm(exact_state)
             
-        else:
-            # TODO: figure out convergence_dim things for now compare to trotter
-            # conv = find_converged_krylov_dim(time_evolve_krylov, H, psi0, self.time, convergence_dims, tol=tol)
-            # exact_state = conv["states"][-1]  # best available proxy: largest converged run
-            # exact_norm = np.linalg.norm(exact_state)
-            # ground_truth_kind = "self_convergence"
+        # elif:
+        #     trotter_state = time_evolve_trotter(self.H, self.initial_state, self.time, **self.trotter_kwargs)
+        #     ground_truth_kind = "trotter"
+        #     exact_norm = np.linalg.norm(trotter_state)
 
-            trotter_state = time_evolve_trotter(self.H, self.initial_state, self.time, **self.trotter_kwargs)
-            ground_truth_kind = "trotter"
-            exact_norm = np.linalg.norm(trotter_state)
+        else:
+            conv = self.find_converged_krylov_dim(time_evolve_krylov, self.H, self.initial_state, self.time, convergence_dims, tol=tol)
+            exact_state = conv["states"][-1]  # best available proxy: largest converged run
+            exact_norm = np.linalg.norm(exact_state)
+            ground_truth_kind = "self_convergence"
+
+
         
         results = {}
         for method in methods or self.methods:
@@ -205,32 +307,6 @@ class Benchmark:
             log.info("validate_accuracy: method checked", extra={"context": {
                             "method": method, "n_qubits": self.H.num_qubits, **{k: v for k, v in results[method].items()},
                         }})
-        return results
-
-    # Benchmark Comparison Plots
-    def benchmark_runtime(self, n_qubits_list, methods):
-        methods = methods or self.methods
-        log.info("benchmark_runtime: starting", extra={"context": {
-            "n_qubits_list": list(n_qubits_list), "methods": methods,
-        }})
-        results = { method: {"n_qubits": [], "runtime_sec": []} for method in methods }
-
-        for n_qubits in n_qubits_list:
-            hamiltonian, psi0, kdim, nrv = self._reconstruct_hamiltonian(n_qubits)
-            for method in methods:
-                results[method]["n_qubits"].append(n_qubits)
-                try:
-                    exact_state, runtime = self._run_method(method, hamiltonian, psi0, kdim)
-                    results[method]["runtime_sec"].append(runtime)
-                    log.debug("benchmark_runtime: point", extra={"context": {
-                        "method": method, "n_qubits": n_qubits, "runtime_sec": runtime,
-                    }})
-                except Exception as e:
-                    log.warning("benchmark_runtime: method failed, recording None", extra={"context": {
-                        "method": method, "n_qubits": n_qubits, "error": str(e),
-                    }})
-                    results[method]["runtime_sec"].append(None)   # TODO: don't crash the sweep
-        log.info("benchmark_runtime: complete")
         return results
 
     def estimate_memory_gb(self, krylov_dim, n_hamiltonian_terms, num_random_vectors=None):
@@ -257,56 +333,6 @@ class Benchmark:
             result["total_gb_randomized"] = sparse_H_gb + V_gb + sketch_storage_gb
     
         return result
-
-    def benchmark_memory(self, n_qubits_list, methods, empirical=False):
-        methods = methods or self.methods
-        results = { method: {"n_qubits": [], "memory_gb": []} for method in methods }
-
-        if empirical:
-            for m in methods:
-                results[m]["memory_gb_measured"] = []
-
-        # theoretical calcualtes memory usage
-        for n_qubits in n_qubits_list:
-            hamiltonian, psi0, kdim, nrv = self._reconstruct_hamiltonian(n_qubits)
-            n_terms = len(hamiltonian)
- 
-            for method in methods:
-                results[method]["n_qubits"].append(n_qubits)
- 
-                if method == "naive":
-                    dim = 2 ** n_qubits
-                    est_gb = (dim ** 2 * 16) / 1e9  # dense N x N complex128
-                elif method in ("krylov",):
-                    est = self.estimate_memory_gb(kdim, n_terms)
-                    est_gb = est["total_gb_deterministic"]
-                elif method in ("randomized_krylov", "randomized_krylov_gaussian"):
-                    est = self.estimate_memory_gb(kdim, n_terms, nrv)
-                    est_gb = est["total_gb_randomized"]
-                elif method == "trotter":
-                    # statevector + circuit -- dominated by the same O(N) statevector
-                    est_gb = (2 ** n_qubits * 16) / 1e9
-                else:
-                    est_gb = None
- 
-                results[method]["memory_gb"].append(est_gb)
-
-                # Emperical measures peak memory usage
-                if empirical:
-                    try:
-                        tracemalloc.start()
-                        self._run_method(method, hamiltonian, psi0, self.time, kdim, nrv)
-                        _, peak = tracemalloc.get_traced_memory()
-                        tracemalloc.stop()
-                        results[method]["memory_gb_measured"].append(peak / 1e9)
-                    except Exception as e:
-                        log.warning("benchmark_memory: empirical measurement failed", extra={"context": {
-                            "method": method, "n_qubits": n_qubits, "error": str(e),
-                        }})
-                        results[method]["memory_gb_measured"].append(None)
- 
-        log.info("benchmark_memory: complete")
-        return results
         
 
     def benchmark(self, n_qubits_list, methods=None, empirical_memory=False):
@@ -325,6 +351,19 @@ class Benchmark:
         runtime_sec from an empirical=True run.
         """
         methods = methods or self.methods
+        seed_val = self.seed
+
+        run_config = {
+            "n_qubits_list": list(n_qubits_list),
+            "time_list": [self.time],
+            "methods": list(methods),
+            "empirical_memory": empirical_memory,
+            "seed": seed_val,
+        }
+
+        run_dir = start_run(self.output_dir, run_config)
+        configure_logging(json_path=run_dir / "run.log.jsonl", console_level="INFO")
+
         log.info("benchmark: starting", extra={"context": {
             "n_qubits_list": list(n_qubits_list), "methods": methods,
             "empirical_memory": empirical_memory,
@@ -355,37 +394,62 @@ class Benchmark:
                     est_gb = None
                 results[method]["memory_gb"].append(est_gb)
 
-                # --- single run: measures runtime, optionally wrapped in tracemalloc ---
+                # measures runtime, wrapped in tracemalloc
                 try:
                     if empirical_memory:
                         tracemalloc.start()
                         state, runtime = self._run_method(method, hamiltonian, psi0, self.time, kdim, nrv)
                         _, peak = tracemalloc.get_traced_memory()
                         tracemalloc.stop()
-                        results[method]["memory_gb_measured"].append(peak / 1e9)
+                        measured_mem_gb = peak / 1e9
+                        results[method]["memory_gb_measured"].append(measured_mem_gb)
                     else:
                         _, runtime = self._run_method(method, hamiltonian, psi0, self.time, kdim, nrv)
 
                     results[method]["runtime_sec"].append(runtime)
                     results[method]["state"].append(state)
-                    log.debug("benchmark: point", extra={"context": {
-                        "method": method, "n_qubits": n_qubits, "runtime_sec": runtime,
+                    row = {
+                        "n_qubits": n_qubits,
+                        "method": method,
+                        "time": self.time,
+                        "krylov_dim": kdim if method in ("krylov", "randomized_krylov", "randomized_krylov_gaussian") else None,
+                        "num_random_vectors": nrv if "randomized" in method else None,
+                        "runtime_sec": runtime,
+                        "memory_gb_est": est_gb,
+                        "memory_gb_measured": measured_mem_gb,
+                        "evolved_state_norm": float(np.linalg.norm(state)) if state is not None else None,
+                    }
+                    append_result_row(run_dir, row)
+
+                    log.debug("benchmark: point complete", extra={"context": {
+                        "method": method, "n_qubits": n_qubits, "runtime_sec": runtime
                     }})
+
 
                 except Exception as e:
                     log.warning("benchmark: method failed, recording None", extra={"context": {
-                        "method": method, "n_qubits": n_qubits, "error": str(e),
+                        "method": method, "n_qubits": n_qubits, "error": str(e)
                     }})
                     results[method]["runtime_sec"].append(None)
+                    results[method]["state"].append(None)
                     if empirical_memory:
                         results[method]["memory_gb_measured"].append(None)
                         try:
-                            tracemalloc.stop()  # in case it was left running after a mid-call failure
+                            tracemalloc.stop()
                         except Exception:
                             pass
 
-        log.info("benchmark: complete")
-        return results
+                    # Record failed 
+                    error_row = {
+                        "n_qubits": n_qubits,
+                        "method": method,
+                        "time": self.time,
+                        "error": str(e),
+                    }
+                    append_result_row(run_dir, error_row)
+
+        log.info("benchmark: complete", extra={"context": {"run_dir": str(run_dir)}})
+        return results, run_dir
     
     def parameter_study(self, n_qubits_list, krylov_dim_list, s_ratio_list, time_list,
                               methods=("krylov", "randomized_krylov"), seed=67,
