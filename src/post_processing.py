@@ -300,8 +300,14 @@ def plot_parameter_study(
     if target_save_path:
         plt.savefig(target_save_path, dpi=150, bbox_inches="tight")
         log.info("Plot saved", extra={"context": {"target_path": target_save_path}})
+        plt.show()
         plt.close(fig)
 
-    plt.show()
+    else:
+        plt.show()
+        log.info("No save path given so no plot saved")
+
+    
+    
 
     return fig

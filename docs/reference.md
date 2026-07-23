@@ -1,3 +1,9 @@
 ::: randquantkry.evolution
 ::: randquantkry.hamiltonian
 ::: randquantkry.benchmark
+::: randquantkry.post_processing
+::: randquantkry.observables
+::: randquantkry.trotter
+::: randquantkry.utils.reproducible_runs
+::: randquantkry.utils.logging_config
+::: randquantkry.utils.meta_metadata_file_generator
