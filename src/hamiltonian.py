@@ -8,7 +8,9 @@
 from qiskit.quantum_info import SparsePauliOp, Operator
 import numpy as np
 from scipy.linalg import expm
+from randquantkry.utils.logging_config import get_logger
 
+log = get_logger(__name__)
 
 def build_hamiltonian(n_qubits: int,  terms: list[tuple[str, int, float]], angle: float = 0.0) -> SparsePauliOp:
     """
@@ -43,6 +45,14 @@ def build_hamiltonian(n_qubits: int,  terms: list[tuple[str, int, float]], angle
         coefficients.append(coeff)
 
     hamiltonian = SparsePauliOp(labels, coeffs=np.array(coefficients, dtype=complex))
+    log.info(
+        "build_hamiltonian: built",
+        extra={"context": {
+            "n_qubits": n_qubits,
+            "matrix_dim": 2 ** n_qubits,
+            "n_terms": len(terms),
+        }},
+    )
     return hamiltonian
 
 def build_initial_state(n_qubits=int, flipped_qubit=int):
@@ -98,6 +108,10 @@ def reconstruct_hamiltonian(n_qubits: int, hamiltonian: SparsePauliOp):
 
         for start_qubit in positions:
             new_terms.append((gate, start_qubit, avg_coeff))
+    log.info(
+        "reconstruct_hamiltonian: reconstructed",
+        extra={"context": {"n_qubits": n_qubits, "n_original_terms": len(terms), "gate_types": list(avg_coeff_by_gate_type)}},
+    )
     
     return build_hamiltonian(n_qubits, new_terms)
 

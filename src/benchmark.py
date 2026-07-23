@@ -10,6 +10,7 @@ from time import perf_counter
 import numpy as np
 import tracemalloc
 import pandas as pd
+from pathlib import Path
  
 from .evolution import (
     time_evolve_naive,
@@ -77,7 +78,7 @@ class Benchmark:
             raise ValueError(f"Unknown method(s) {sorted(unknown)}; valid options are {ALL_METHODS}")
         self.trotter_kwargs = trotter_kwargs or {"num_steps": 100, "order": 1}
         self.seed = seed
-        self.output_dir = output_dir
+        self.output_dir = Path(f"../{output_dir}").resolve()
 
     def _resolve_krylov_dim(self, n_qubits):
         N = 2 ** n_qubits
@@ -140,7 +141,9 @@ class Benchmark:
         runtime = perf_counter() - t0
         return state, runtime
 
-    import numpy as np
+    def calculate_rel_error(calc_state, exact_state):
+        exact_norm = np.linalg.norm(exact_state)
+        return float(np.linalg.norm(calc_state - exact_state) / exact_norm)
 
 
     def find_converged_krylov_dim(evolve_fn, hamiltonian, initial_state, time,
@@ -354,11 +357,11 @@ class Benchmark:
         seed_val = self.seed
 
         run_config = {
-            "n_qubits_list": list(n_qubits_list),
-            "time_list": [self.time],
-            "methods": list(methods),
-            "empirical_memory": empirical_memory,
-            "seed": seed_val,
+        "n_qubits_list": list(n_qubits_list),
+        "time_list": [self.time],
+        "methods": list(methods),
+        "empirical_memory": empirical_memory,
+        "seed": seed_val,
         }
 
         run_dir = start_run(self.output_dir, run_config)
@@ -395,6 +398,7 @@ class Benchmark:
                 results[method]["memory_gb"].append(est_gb)
 
                 # measures runtime, wrapped in tracemalloc
+                measured_mem_gb = None
                 try:
                     if empirical_memory:
                         tracemalloc.start()
@@ -454,6 +458,70 @@ class Benchmark:
     def parameter_study(self, n_qubits_list, krylov_dim_list, s_ratio_list, time_list,
                               methods=("krylov", "randomized_krylov"), seed=67,
                               accuracy_convergence_dims=None):
+
+        """
+        Run a full parameter sweep comparing Krylov and randomized Krylov
+        time evolution across system size, Krylov dimension, sketch ratio,
+        and simulation time, recording runtime, peak memory, and accuracy
+        for every combination.
+ 
+        For each `n_qubits`, a Hamiltonian and initial state are
+        reconstructed via `self._reconstruct_hamiltonian`, then for every
+        `time` a ground-truth state is established (exact diagonalization
+        if `n_qubits <= MAX_NAIVE_QUBITS`, self-convergence proxy if
+        `accuracy_convergence_dims` is given, Trotterized evolution as a
+        fallback if `"trotter"` is in `methods`, or no ground truth at all
+        otherwise). Each requested method is then run at every
+        `krylov_dim` (and, for `"randomized_krylov"`, every `s_ratio`),
+        with peak memory measured via `tracemalloc` and relative error
+        computed against the ground-truth state when available. Points
+        where `krylov_dim` or the derived sketch size `s` would meet or
+        exceed the Hilbert space dimension `N = 2**n_qubits` are skipped.
+ 
+        Results are both accumulated in memory and appended incrementally
+        to disk as they're produced, so a run that crashes partway through
+        still leaves a usable partial result on disk.
+ 
+        Parameters
+        ----------
+        n_qubits_list : list[int]
+            System sizes to sweep over.
+        krylov_dim_list : list[int]
+            Krylov subspace dimensions to try at each system size.
+        s_ratio_list : list[float]
+            Ratios of sketch dimension to `krylov_dim` to try for the
+            `"randomized_krylov"` method (`s = ceil(s_ratio * krylov_dim)`).
+            Ignored if `"randomized_krylov"` is not in `methods`.
+        time_list : list[float]
+            Simulation times to sweep over.
+        methods : tuple[str, ...], optional
+            Which methods to run; any combination of `"krylov"` and
+            `"randomized_krylov"`. Default is both.
+        seed : int, optional
+            Seed used for reproducibility of the run (e.g. randomized
+            sketch generation). Default is 67.
+        accuracy_convergence_dims : list[int] or None, optional
+            If provided, and `n_qubits > MAX_NAIVE_QUBITS`, use a
+            self-convergence check (see `find_converged_krylov_dim`) as
+            the ground truth instead of exact diagonalization or Trotter.
+            Currently unimplemented (`TODO`) -- setting this sets
+            `ground_truth_kind = "self_convergence"` but does not yet
+            compute an actual ground-truth state or `rel_error` for
+            those points. Default is None.
+ 
+        Returns
+        -------
+        pandas.DataFrame
+            One row per (n_qubits, time, krylov_dim, method[, s_ratio])
+            combination actually run, with columns: `n_qubits`,
+            `krylov_dim`, `s_ratio`, `num_random_vectors`, `time`,
+            `method`, `runtime_sec`, `memory_gb`, `rel_error`,
+            `ground_truth`, `evolved_state_norm`. `rel_error` is `None`
+            wherever no ground-truth state was available.
+        run_dir : pathlib.Path
+            Directory containing this run's persisted config, JSONL log,
+            and incrementally-appended result rows.
+        """
         # set up storing results
         run_config = {
         "n_qubits_list": list(n_qubits_list),
