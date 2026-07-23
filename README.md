@@ -5,7 +5,7 @@
 Simulating quantum dynamics classically hits an exponential wall: the state vector of an
 *n*-qubit system lives in a 2ⁿ-dimensional space, and exact methods scale accordingly. This
 project explores how far that wall can be pushed back using **randomized numerical linear
-algebra (RandLA)** combined with **Krylov subspace methods** — and, more specifically, *why*
+algebra (RandLA)** combined with **Krylov subspace methods** and, more specifically, *why*
 that reach is bounded by the same physics that governs the problem in the first place:
 [Lieb–Robinson bounds](https://en.wikipedia.org/wiki/Lieb%E2%80%93Robinson_bounds) limit how
 fast information spreads through a local Hamiltonian, which in turn sets how large a Krylov
