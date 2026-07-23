@@ -4,10 +4,11 @@ from randquantkry.hamiltonian import build_hamiltonian
 from randquantkry.benchmark import Benchmark
 from randquantkry.post_processing import plot_parameter_study
 from randquantkry.utils.logging_config import configure_logging
+from randquantkry.utils.reproducible_runs import load_run
 
 configure_logging(console_level='INFO')
 
-n_qubits = 8
+n_qubits = 20
 rng = np.random.default_rng(0)
 
 terms = []
@@ -40,8 +41,9 @@ benchmark1 = Benchmark(hamiltonian, initial_state, time, krylov_dim, num_random_
 #     methods=("krylov", "randomized_krylov"),
 #     seed=67,
 #     )
-
+# df is ready for plot_parameter_study(df, ...) immediately
 # # 1. Runtime vs krylov_dim, comparing methods, at a fixed (n_qubits, time)
+
 # data = rows.copy()
 # data["method_label"] = data.apply(
 #     lambda r: f"{r['method']}" if r["s_ratio"] is None or (isinstance(r["s_ratio"], float) and pd.isna(r["s_ratio"]))
@@ -64,23 +66,44 @@ benchmark1 = Benchmark(hamiltonian, initial_state, time, krylov_dim, num_random_
 # print(rows[["n_qubits", "krylov_dim", "s_ratio", "method", "runtime_sec", "rel_error"]])
 
 rows = benchmark1.parameter_study(
-    n_qubits_list=[10, 14, 18, 22],
-    krylov_dim_list=[20, 40, 80, 160], 
-    s_ratio_list=[2.0, 3.0, 5.0],
-    time_list=[0.5, 1.0, 2.0, 3.0],
-    methods=("krylov", "randomized_krylov"),
+    n_qubits_list=[6, 8, 10, 14, 18],                                  # FIX at one value — isolate s_ratio's effect alone
+    krylov_dim_list=[20, 40, 60, 80],                                  # FIX at one value — same reason
+    s_ratio_list=[2.0],     # fine-grained, all safely > 1.0
+    time_list=[1, 5, 10, 20],                                        # FIX — irrelevant to this specific question
+    methods=("naive", "krylov", "randomized_krylov"),                        # only this method has an s_ratio dimension at all
     seed=67,
 )
-# 
-# plotting
 
-# runtime vs krylov_dim -- now shows 4 clean lines: krylov, and randomized_krylov at each s_ratio
-plot_parameter_study(rows, x="krylov_dim", y="runtime_sec", fixed={"n_qubits": 14, "time": 1.0})
+# rows = benchmark1.parameter_study(
+#     n_qubits_list=[10],                                  # FIX at one value — isolate s_ratio's effect alone
+#     krylov_dim_list=[20, 40, 100],                                  # FIX at one value — same reason
+#     s_ratio_list=[1.05, 1.1, 1.2, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0],     # fine-grained, all safely > 1.0
+#     time_list=[0.5, 1.0, 2.0, 3.0],                                        # FIX — irrelevant to this specific question
+#     methods=("randomized_krylov"),                        # only this method has an s_ratio dimension at all
+#     seed=67,
+# )
 
-# accuracy vs s_ratio -- now correctly shows ONE clean line (randomized_krylov only;
-# "krylov" is automatically dropped since it has no s_ratio, and hue is forced to "method"
-# instead of the redundant "s_ratio" you had)
-plot_parameter_study(rows, x="s_ratio", y="rel_error", fixed={"n_qubits": 14, "krylov_dim": 40, "time": 1.0})
+# print(rows[["s_ratio", "num_random_vectors", "rel_error"]])
 
-# runtime vs n_qubits -- same 4-line fix as plot 1
-plot_parameter_study(rows, x="n_qubits", y="runtime_sec", fixed={"krylov_dim": 40, "time": 1.0})
+# rows = benchmark1.parameter_study(
+#     n_qubits_list=[10, 14, 18, 22],
+#     krylov_dim_list=[20, 40, 80, 160], 
+#     s_ratio_list=[2.0, 3.0, 5.0],
+#     time_list=[0.5, 1.0, 2.0, 3.0],
+#     methods=("krylov", "randomized_krylov"),
+#     seed=67,
+# )
+
+
+# # plotting
+
+# # runtime vs krylov_dim -- now shows 4 clean lines: krylov, and randomized_krylov at each s_ratio
+# plot_parameter_study(rows, x="krylov_dim", y="runtime_sec", fixed={"n_qubits": 14, "time": 1.0})
+
+# # accuracy vs s_ratio -- now correctly shows ONE clean line (randomized_krylov only;
+# # "krylov" is automatically dropped since it has no s_ratio, and hue is forced to "method"
+# # instead of the redundant "s_ratio" you had)
+# plot_parameter_study(rows, x="s_ratio", y="rel_error", fixed={"n_qubits": 14, "krylov_dim": 40, "time": 1.0})
+
+# # runtime vs n_qubits -- same 4-line fix as plot 1
+# plot_parameter_study(rows, x="n_qubits", y="runtime_sec", fixed={"krylov_dim": 40, "time": 1.0})

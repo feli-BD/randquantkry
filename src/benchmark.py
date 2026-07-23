@@ -146,9 +146,7 @@ class Benchmark:
         # randomized_krylov -> krylov as num_random_vectors grows large
         results = {}
         for method in methods or self.methods:
-            kdim = self._resolve_krylov_dim(self.H.num_qubits)
-            nrv = self._resolve_num_random_vectors(kdim, self.H.num_qubits)
-            state, runtime = self._run_method(method, self.H, self.initial_state, self.time, kdim, nrv)
+            state, runtime = self._run_method(method, self.H, self.initial_state, self.time, self.krylov_dim, self.num_random_vectors)
             has_nan = bool(np.any(np.isnan(state)) or np.any(np.isinf(state)))
             if not has_nan:
                 norm = float(np.linalg.norm(state))
@@ -188,9 +186,9 @@ class Benchmark:
             # exact_norm = np.linalg.norm(exact_state)
             # ground_truth_kind = "self_convergence"
 
-            exact_state = time_evolve_trotter(self.H, self.initial_state, self.time, **self.trotter_kwargs)
+            trotter_state = time_evolve_trotter(self.H, self.initial_state, self.time, **self.trotter_kwargs)
             ground_truth_kind = "trotter"
-            exact_norm = np.linalg.norm(exact_state)
+            exact_norm = np.linalg.norm(trotter_state)
         
         results = {}
         for method in methods or self.methods:
@@ -198,9 +196,7 @@ class Benchmark:
                 results[method] = {"rel_error": 0.0, "ground_truth": ground_truth_kind}
                 continue
             try:
-                kdim = self._resolve_krylov_dim(self.H.num_qubits)
-                nrv = self._resolve_num_random_vectors(kdim, self.H.num_qubits)
-                state, runtime = self._run_method(method, self.H, self.initial_state, self.time, kdim, nrv)
+                state, _ = self._run_method(method, self.H, self.initial_state, self.time, self.krylov_dim, self.num_random_vectors)
                 rel_error = float(np.linalg.norm(state - exact_state) / exact_norm)
                 results[method] = {"rel_error": rel_error, "ground_truth": ground_truth_kind}
             except Exception as e:
@@ -224,7 +220,7 @@ class Benchmark:
             for method in methods:
                 results[method]["n_qubits"].append(n_qubits)
                 try:
-                    exact_state, runtime = self._run_method(method, hamiltonian, psi0, self.time, kdim)
+                    exact_state, runtime = self._run_method(method, hamiltonian, psi0, kdim)
                     results[method]["runtime_sec"].append(runtime)
                     log.debug("benchmark_runtime: point", extra={"context": {
                         "method": method, "n_qubits": n_qubits, "runtime_sec": runtime,
@@ -346,7 +342,7 @@ class Benchmark:
             for method in methods:
                 results[method]["n_qubits"].append(n_qubits)
 
-                # theoretical memory: cheap, no computation needed 
+                # --- theoretical memory: cheap, no computation needed ---
                 if method == "naive":
                     est_gb = (2 ** n_qubits) ** 2 * 16 / 1e9
                 elif method == "krylov":
@@ -359,7 +355,7 @@ class Benchmark:
                     est_gb = None
                 results[method]["memory_gb"].append(est_gb)
 
-                # single run: measures runtime, optionally wrapped in tracemalloc 
+                # --- single run: measures runtime, optionally wrapped in tracemalloc ---
                 try:
                     if empirical_memory:
                         tracemalloc.start()
@@ -451,7 +447,7 @@ class Benchmark:
 
                     if "krylov" in methods:
                         tracemalloc.start()
-                        state, runtime = self._run_method("krylov", hamiltonian, psi0, self.time, krylov_dim, nrv)
+                        state, runtime = self._run_method("krylov", hamiltonian, psi0, time, krylov_dim, nrv)
                         _, peak = tracemalloc.get_traced_memory()
                         tracemalloc.stop()  
                         mem = (peak / 1e9)                          
@@ -461,8 +457,9 @@ class Benchmark:
                             "n_qubits": n_qubits, "krylov_dim": krylov_dim, "s_ratio": None,
                             "num_random_vectors": None, "time": time, "method": "krylov",
                             "runtime_sec": runtime, "memory_gb": mem, "rel_error": rel_error,
-                            "evolved_state_norm": evolved_state_norm, "ground_truth": ground_truth_kind,
+                            "ground_truth": ground_truth_kind, "evolved_state_norm": evolved_state_norm,
                             }
+                        
                         rows.append(row)
                         append_result_row(run_dir, row) 
                     
@@ -472,19 +469,21 @@ class Benchmark:
                             if s >= N:
                                 continue
                             tracemalloc.start()
-                            state, runtime = self._run_method("randomized_krylov", hamiltonian, psi0, self.time, krylov_dim, s)
+                            state, runtime = self._run_method("randomized_krylov", hamiltonian, psi0, time, krylov_dim, s)
                             _, peak = tracemalloc.get_traced_memory()
                             tracemalloc.stop()
                             mem = peak / 1e9
+                            evolved_state_norm = float(np.linalg.norm(state))
                             rel_error = (float(np.linalg.norm(state - exact_state) / exact_norm) if exact_state is not None else None)
                             row = {
                                 "n_qubits": n_qubits, "krylov_dim": krylov_dim, "s_ratio": s_ratio,
-                                "num_random_vectors": s, "time": time, "method": "randomized_krylov",
-                                "runtime_sec": runtime, "memory_gb": mem, "rel_error": rel_error,
-                                "evolved_state_norm": evolved_state_norm,  "ground_truth": ground_truth_kind,
+                                "time": time, "method": "randomized_krylov",  "runtime_sec": runtime, "memory_gb": mem, "rel_error": rel_error,
+                                "ground_truth": ground_truth_kind, "evolved_state_norm": evolved_state_norm,
                             }
+
                             rows.append(row)
-                            append_result_row(run_dir, row)
+                            append_result_row(run_dir, row) 
+
 
         log.info("parameter_study: complete", extra={"context": {"n_rows": len(rows), "run_dir": str(run_dir)}})
         return pd.DataFrame(rows), run_dir

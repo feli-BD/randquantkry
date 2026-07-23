@@ -6,6 +6,7 @@ stages:
   - check
   - test
   - study
+  - deploy
 
 variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
@@ -92,3 +93,14 @@ unit-tests:
 
 
 # Stage 4: build documentation 
+pages:
+  stage: deploy
+  image: ghcr.io/astral-sh/uv:python3.11-bookworm-slim
+  script:
+    - uv sync --frozen
+    - uv run mkdocs build --site-dir public
+  artifacts:
+    paths:
+      - public
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

@@ -15,6 +15,8 @@ re-running a sweep, and benchmark.py stays free of any matplotlib dependency
 # imports
 import matplotlib.pyplot as plt
 from .benchmark import Benchmark
+import numpy as np
+import pandas as pd
 
 # One consistent color/marker/linestyle per method, reused across every plot
 # in this module, so "randomized_krylov" is always the same green line
@@ -145,67 +147,102 @@ def plot_memory(results, methods=None, ram_limits=None,
 
     return fig
 
-import matplotlib.pyplot as plt
-import pandas as pd
-import numpy as np
 
+def plot_parameter_study(
+    df,
+    x="krylov_dim",
+    y="evolved_state_norm",
+    fixed=None,
+    hue="method",
+    y_log=None,
+    reference_line=None,
+    save_path=None,
+):
+    """Plot y vs x from a parameter_study() results DataFrame, one line per distinct
 
-def plot_parameter_study(df, x="krylov_dim", y="runtime_sec", fixed=None, hue="method", save_path=None):
-    """
-    Plot y vs x from a parameter_study() results DataFrame, one line per
-    distinct value of `hue`, after filtering to a fixed slice.
+    value of `hue`, after filtering to a fixed slice.
 
-    Two automatic safeguards, based on lessons from earlier plots:
-
-    1. If hue="method" and x is NOT "s_ratio": rows that share a method but
-       differ in s_ratio (e.g. randomized_krylov at s_ratio=1.5, 2.0, 3.0)
-       would otherwise collapse into one jagged, meaningless line. This
-       auto-builds a combined label ("randomized_krylov (s_ratio=2.0)") so
-       each sketch size gets its own clean line instead.
-
-    2. If x == "s_ratio": rows with no meaningful s_ratio (e.g. plain
-       "krylov", which has s_ratio=None/NaN) are dropped automatically,
-       since they'd otherwise contribute a stray single point or a NaN gap.
-       hue is forced to "method" in this case (using it as both x and hue
-       would create one-point "lines" with nothing to connect).
+    New parameters:
+    --------------
+    y_log : bool or None
+        Explicitly force log scale on y-axis. If None, auto-detects for runtimes,
+        memory, and norm errors.
+    reference_line : float or None
+        Draws a horizontal dashed reference line at this y-value (e.g., y=1.0 for norm
+        or y=0 for error).
     """
     data = df.copy()
+
+    # 1. Apply fixed slice filters
     if fixed:
         for col, val in fixed.items():
             data = data[data[col] == val]
     if data.empty:
-        raise ValueError(f"No rows match fixed={fixed} -- check your filter values against df's actual contents.")
+        raise ValueError(
+            f"No rows match fixed={fixed} -- check your filter values against df's actual contents."
+        )
 
+    # 2. Handle s_ratio safeguards
     if x == "s_ratio":
-        # rows without a real s_ratio (e.g. plain "krylov") can't sit on this x-axis at all
         data = data.dropna(subset=["s_ratio"])
         if data.empty:
-            raise ValueError("No rows have a non-null s_ratio after filtering -- did you mean to include 'krylov'?")
-        hue_col = "method"   # using s_ratio as both x and hue would give one-point "lines"
+            raise ValueError(
+                "No rows have a non-null s_ratio after filtering -- did you mean to include 'krylov'?"
+            )
+        hue_col = "method"
     elif hue == "method" and "s_ratio" in data.columns:
+
         def make_label(row):
             if pd.isna(row["s_ratio"]):
                 return row["method"]
             return f"{row['method']} (s_ratio={row['s_ratio']})"
+
         data["_hue_label"] = data.apply(make_label, axis=1)
         hue_col = "_hue_label"
     else:
         hue_col = hue
 
+    # 3. Create plot
     fig, ax = plt.subplots(figsize=(7.5, 5.5))
+
     for hue_val, group in data.groupby(hue_col):
         group_sorted = group.sort_values(x)
-        ax.plot(group_sorted[x], group_sorted[y], marker="o", label=str(hue_val), linewidth=2)
+        ax.plot(
+            group_sorted[x],
+            group_sorted[y],
+            marker="o",
+            label=str(hue_val),
+            linewidth=2,
+            alpha=0.85,
+        )
 
-    if y in ("runtime_sec", "memory_gb"):
+    # 4. Reference line (e.g. ideal norm = 1.0)
+    if reference_line is not None:
+        ax.axhline(
+            y=reference_line,
+            color="black",
+            linestyle="--",
+            linewidth=1.2,
+            label=f"Ideal ({reference_line})",
+            zorder=1,
+        )
+
+    # 5. Log-scale decision logic
+    auto_log_metrics = {"runtime_sec", "memory_gb", "rel_error", "norm_error"}
+    should_log = (
+        y_log if y_log is not None else (y in auto_log_metrics or "error" in y)
+    )
+
+    if should_log:
         ax.set_yscale("log")
 
+    # 6. Formatting & Labels
     ax.set_xlabel(x, fontsize=12)
     ax.set_ylabel(y, fontsize=12)
     title = f"{y} vs {x}" + (f"  (fixed: {fixed})" if fixed else "")
     ax.set_title(title, fontsize=13, fontweight="bold")
     ax.legend(fontsize=10)
-    ax.grid(alpha=0.3)
+    ax.grid(True, which="both", alpha=0.3, linestyle=":")
     plt.tight_layout()
 
     if save_path:

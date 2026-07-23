@@ -2,7 +2,7 @@
 import numpy as np
 import pytest
 from randquantkry.hamiltonian import build_hamiltonian
-from randquantkry.benchmark import Benchmark  # or however yours is constructed now
+from randquantkry.benchmark import Benchmark 
 
 @pytest.fixture
 def small_bench():

@@ -294,7 +294,7 @@ def time_evolve_randomized_krylov(hamiltonian, initial_state, time, krylov_dim, 
     # assemble the tridiagonal matrix
     
     k = len(V) - 1                       # number of accepted Krylov vectors
-    Sb = S(initial_state)
+    Sb = S(v)
     SV_mat = np.array(SV[:k]).T           # s x k
     SAV_mat = np.array(SAV[:k]).T         # s x k  (you'll need to build SAV the same way as SV -- see note below)
 
