@@ -53,6 +53,16 @@ cd randquantkry
 uv sync --extra dev
 ```
 
+To use notebooks with this project's environment (RECOMMENDED):
+
+```bash
+uv add --dev ipykernel
+uv run python -m ipykernel install --user --name randquantkry --display-name "randquantkry (uv)"
+```
+
+Then select **"randquantkry (uv)"** as the kernel in Jupyter/VS Code. You might need to restart VSCode to find the new kernel. Alternatively, run `uv run --extra dev jupyter lab` to launch Jupyter directly inside the project's
+environment without registering a persistent kernel.
+
 If you prefer `pip`:
 
 ```bash
