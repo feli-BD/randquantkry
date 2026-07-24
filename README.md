@@ -3,7 +3,7 @@
 **A RandNLA-accelerated Krylov subspace solver for quantum time evolution.**
 
 <p align="center">
-  <img src="output/Memory20qs.png" alt="Memory vs. System Size" width="500">
+  <img src="docs/output/Memory20qs.png" alt="Memory vs. System Size" width="500">
 </p>
 
 Simulating quantum dynamics classically hits an exponential wall: the state vector of an
@@ -67,7 +67,8 @@ If you prefer `pip`:
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate 
+source .venv/bin/activate # Linux (or Mac)
+.venv\Scripts\activate.bat # Windows  
 pip install -e ".[dev]"
 ```
 
@@ -75,23 +76,23 @@ pip install -e ".[dev]"
 
 ### Interactive Walkthroughs & Tutorials
 
-For hands-on, step-by-step introductions to the package, explore the interactive Jupyter notebooks in the `scripts/` directory:
+For hands-on, step-by-step introductions to the package, explore the interactive Jupyter notebooks in the **[`scripts`](scripts/)** directory:
 
-1. **[`scripts/tutorial.ipynb`](scripts/tutorial.ipynb)** — **Getting Started**: An overview covering Hamiltonian construction and naive quantum state evolution.
+1. **[`scripts/tutorial.ipynb`](scripts/tutorial.ipynb)** - **Getting Started**: An overview covering Hamiltonian construction and naive quantum state evolution.
 <p align="center">
-  <img src="output/tutorial1.png" alt="Hamiltonian vs Unitary" width="500">
+  <img src="docs/output/tutorial1.png" alt="Hamiltonian vs Unitary" width="500">
 </p>
 
-2. **[`scripts/tutorial_evolution_methods.ipynb`](scripts/tutorial_evolution_methods.ipynb)** — **Evolution Algorithms**: Dive into the available time-evolution solvers (Krylov, Randomized Krylov) and a introductory comparison of accuracy
+2. **[`scripts/tutorial_evolution_methods.ipynb`](scripts/tutorial_evolution_methods.ipynb)** - **Evolution Algorithms**: Dive into the available time-evolution solvers (Krylov, Randomized Krylov) and a introductory comparison of accuracy
 
-3. **[`scripts/tutorial_benchmarking.ipynb`](scripts/tutorial_benchmarking.ipynb)** — **Benchmarking Workflows**: Shows how to benchmark runtime and memory scaling across different qubit sizes and methods.
+3. **[`scripts/tutorial_benchmarking.ipynb`](scripts/tutorial_benchmarking.ipynb)** - **Benchmarking Workflows**: Shows how to benchmark runtime and memory scaling across different qubit sizes and methods.
 
 <p align="center">
-  <img src="output/Memory_vs_SystemSize.png" alt="Memory vs System Size" width="45%" style="display: inline-block;">
-  <img src="output/Runtime_vs_SystemSize.png" alt="Runtime vs System Size" width="45%" style="display: inline-block;">
+  <img src="docs/output/Memory_vs_SystemSize.png" alt="Memory vs System Size" width="45%" style="display: inline-block;">
+  <img src="docs/output/Runtime_vs_SystemSize.png" alt="Runtime vs System Size" width="45%" style="display: inline-block;">
 </p>
 
-4. **[`scripts/tutorial_parameter_study.ipynb`](scripts/tutorial_parameter_study.ipynb)** — **Parameter Sweeps & Analysis**: How to run multi-variable parameter grids, save structured run artifacts, load JSONL logs, and plot post-processing metrics.
+4. **[`scripts/tutorial_parameter_study.ipynb`](scripts/tutorial_parameter_study.ipynb)** - **Parameter Sweeps & Analysis**: How to run multi-variable parameter grids, save structured run artifacts, load JSONL logs, and plot post-processing metrics.
 
 ## Project structure
 
