@@ -78,7 +78,7 @@ def time_evolve_naive(hamiltonian, initial_state, time):
 
 
 
-def time_evolve_krylov(hamiltonian, initial_state, time, krylov_dim):
+def time_evolve_krylov(hamiltonian, initial_state, time, krylov_dim, instrumental=False):
     """
     Perform time evolution using the Krylov subspace method.
 
@@ -178,11 +178,14 @@ def time_evolve_krylov(hamiltonian, initial_state, time, krylov_dim):
     )
 
     # TODO: add logging and fail loud option for when krylov_dim is too small and the approximation is not accurate enough
-    return evolved_state
+    if instrumental:
+        return evolved_state, V, Tri
+    else:
+        return evolved_state
 
 
 
-def time_evolve_randomized_krylov(hamiltonian, initial_state, time, krylov_dim, num_random_vectors,trunc=2, seed=67):
+def time_evolve_randomized_krylov(hamiltonian, initial_state, time, krylov_dim, num_random_vectors,trunc=2, seed=67, instrumental=False):
     """
     Perform time evolution using the randomized Krylov subspace method.
 
@@ -318,9 +321,10 @@ def time_evolve_randomized_krylov(hamiltonian, initial_state, time, krylov_dim, 
             "evolved_state_norm": float(np.linalg.norm(evolved_state)),
         }},
     )
-
-    return evolved_state
-
+    if instrumental:
+        return evolved_state, SAVw, V
+    else: 
+        return evolved_state
 
 def time_evolve_randomized_krylov_gaussian(hamiltonian, initial_state, time, krylov_dim, num_random_vectors, seed):
     """
