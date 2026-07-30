@@ -17,8 +17,12 @@ import os
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
-
+import platform, psutil
 import pandas as pd
+import sys
+import platform
+import hashlib
+import numpy as np
 
 
 def _get_package_versions(packages=("numpy", "scipy", "qiskit", "pandas")):
@@ -40,6 +44,46 @@ def _get_git_commit():
     except Exception:
         return None
 
+def _get_hardware():
+    try:
+        return {
+            "platform": platform.platform(),
+            "processor": platform.processor(),
+            "cpu_count": psutil.cpu_count(logical=True),
+            "total_memory_gb": round(psutil.virtual_memory().total / 1e9, 2)}
+    except Exception:
+        return None
+
+
+def _get_environment_metadata():
+    repo_root = Path(__file__).resolve().parents[1]  
+    lock_path = repo_root / "uv.lock"
+    metadata = {
+        # Exact Python interpreter, not just package versions
+        "python_version": sys.version,
+        "python_implementation": platform.python_implementation(),  # CPython vs PyPy
+
+        # Lock file hash
+        "uv_lock_sha256": _hash_file(lock_path),
+
+        # The actual math backend NumPy/SciPy are using — this is the missing piece
+        "numpy_blas_info": _get_blas_backend_info(),
+    }
+    return metadata
+
+def _hash_file(path: str) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        h.update(f.read())
+    return h.hexdigest()
+
+def _get_blas_backend_info():
+    """Extract which BLAS/LAPACK library NumPy is actually linked against."""
+    config = np.show_config(mode="dicts")
+    return {
+        "blas": config.get("Build Dependencies", {}).get("blas", {}).get("name", "unknown"),
+        "lapack": config.get("Build Dependencies", {}).get("lapack", {}).get("name", "unknown"),
+    }
 
 def start_run(output_dir, run_config):
     """
@@ -66,14 +110,15 @@ def start_run(output_dir, run_config):
     metadata = {
         "timestamp_utc": datetime.now(timezone.utc).isoformat(),
         "run_config": run_config,
+        "environment": _get_environment_metadata(),
         "package_versions": _get_package_versions(),
         "git_commit": _get_git_commit(),
+        "hardware": _get_hardware()
     }
     with open(run_dir / "metadata.json", "w") as f:
         json.dump(metadata, f, indent=2, default=str)
 
     return run_dir
-
 
 def append_result_row(run_dir, row):
     """
