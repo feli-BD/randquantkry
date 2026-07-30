@@ -322,7 +322,7 @@ def time_evolve_randomized_krylov(hamiltonian, initial_state, time, krylov_dim, 
         }},
     )
     if instrumental:
-        return evolved_state, SAVw, V
+        return evolved_state, V, H_tilde
     else: 
         return evolved_state
 
