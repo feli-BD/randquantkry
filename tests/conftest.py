@@ -1,7 +1,8 @@
 import numpy as np
 import pytest
 from qiskit.quantum_info import SparsePauliOp
-
+from randquantkry.hamiltonian import build_hamiltonian, build_initial_state
+from randquantkry.benchmark import Benchmark
 
 @pytest.fixture
 def small_hamiltonian():
@@ -41,3 +42,27 @@ def localized_hamiltonian():
     labels = ["XXIIIIII", "IZZIIIII"]
     coeffs = [1.0, 0.5]
     return SparsePauliOp(labels, coeffs=coeffs)
+
+
+@pytest.fixture
+def small_hamiltonian():
+    return build_hamiltonian(4, [("XX", 0, 1.0), ("XX", 1, 1.0), ("Z", 0, 0.5)])
+
+@pytest.fixture
+def small_initial_state():
+    return build_initial_state(4, flipped_qubit=0)
+
+@pytest.fixture
+def small_benchmark(small_hamiltonian, small_initial_state, tmp_path):
+    """A Benchmark instance writing to a pytest-managed temp directory,
+    so nothing pollutes your real results/ folder and every test starts clean."""
+    return Benchmark(
+        hamiltonian=small_hamiltonian,
+        initial_state=small_initial_state,
+        time=1.0,
+        krylov_dim=8,
+        num_random_vectors=None,
+        methods=["naive", "krylov", "randomized_krylov"],
+        seed=42,
+        output_dir=str(tmp_path / "results"),
+    )

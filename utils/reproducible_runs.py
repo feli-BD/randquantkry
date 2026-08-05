@@ -157,3 +157,21 @@ def load_run(run_dir):
                     rows.append(json.loads(line))
 
     return pd.DataFrame(rows), metadata
+
+
+# Hash term for checksum calculation
+
+
+def hash_terms(terms: list[tuple[str, int, float]]) -> str:
+    """Checksums for verifying experiment inputs haven't
+     silently changed between runs."""
+    def _serialize_coeff(c):
+        if isinstance(c, complex):
+            return [c.real, c.imag]
+        return c
+
+    serializable = json.dumps(
+        [[gate, qubit, _serialize_coeff(coeff)] for gate, qubit, coeff in terms],
+        sort_keys=True,
+    )
+    return hashlib.sha256(serializable.encode()).hexdigest()

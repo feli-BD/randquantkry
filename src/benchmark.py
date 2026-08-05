@@ -205,7 +205,7 @@ class Benchmark:
         }
         
     # verification: internal consistency, no ground truth needed
-    def verify_consistency(self,  methods: list | None):
+    def verify_consistency(self,  methods=None):
         """Perform basic internal consistency checks across selected methods without requiring ground truth.
 
         Checks performed per method:
@@ -392,11 +392,8 @@ class Benchmark:
             "n_qubits_list": list(n_qubits_list), "methods": methods
         }})
 
-        results = {method: {"n_qubits": [], "state": [], "runtime_sec": [], "memory_gb": []} for method in methods}
-        if empirical_memory:
-            for m in methods:
-                results[m]["memory_gb_measured"] = []
-                results[m]["memory_rss"] = []
+        results = {method: {"n_qubits": [], "state": [], "runtime_sec": [], "memory_gb": [], "memory_rss": []} for method in methods}
+    
 
         for n_qubits in n_qubits_list:
             hamiltonian, initial_state, krylov_dim, number_rand_vectors = self._adjust_run_nqubits(n_qubits)

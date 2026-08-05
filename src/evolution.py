@@ -12,24 +12,31 @@ from scipy.linalg import expm, solve_triangular
 from scipy import sparse
 from scipy.fft import dct
 import numpy as np
+import psutil
 
 # imports from randquantkry
 from randquantkry.utils.logging_config import get_logger
 
 log = get_logger(__name__)
 
-def time_evolve_naive(hamiltonian: SparsePauliOp, initial_state, time: float):
+import psutil
+
+def time_evolve_naive(hamiltonian: SparsePauliOp, initial_state, time: float, memory_buffer_qubits: int = 2):
     """
     Perform naive time evolution of a quantum system.
 
     Parameters
     ----------
     hamiltonian : SparsePauliOp
-        The Hamiltonian object created using build_hamiltonian function from hamiltonian.py .
+        The Hamiltonian object created using build_hamiltonian function from hamiltonian.py.
     initial_state : array-like
         The initial state of the quantum system.
     time : float
         The final simulation time.
+    memory_buffer_qubits : int, default 2
+        Safety margin subtracted (in qubit-equivalent terms) from the
+        available-RAM-based qubit limit, to leave headroom for other
+        allocations (eigenvectors, temporaries, other processes).
 
     Returns
     -------
@@ -37,42 +44,121 @@ def time_evolve_naive(hamiltonian: SparsePauliOp, initial_state, time: float):
         The unitary operator used for the evolution.
     evolved_state : array-like
         The evolved state of the quantum system.
+
+    Raises
+    ------
+    ValueError
+        If the dense Hamiltonian matrix would exceed available system
+        memory (with a safety buffer), the qubit count is too large, or
+        the eigendecomposition step fails for another reason.
     """
+    n_qubits = hamiltonian.num_qubits
+    matrix_dim = 2 ** n_qubits
+
+    # Naive method needs: the dense Hamiltonian (complex128, 16 bytes/entry)
+    # AND the eigenvector matrix of the same size AND some working memory
+    # for np.linalg.eigh's internal LAPACK buffers. Budget ~3x the matrix
+    # size as a rough estimate.
+    estimated_bytes_needed = 3 * (matrix_dim ** 2) * 16
+    available_bytes = psutil.virtual_memory().available
+
+    # Apply the qubit buffer: require the estimate to fit within available
+    # memory as if the qubit count were `memory_buffer_qubits` higher, so
+    # we bail out before actually hitting the wall, not right at it.
+    buffered_matrix_dim = 2 ** (n_qubits + memory_buffer_qubits)
+    buffered_estimate = 3 * (buffered_matrix_dim ** 2) * 16
+
     log.info(
-        "time_evolve_naive: starting",
+        "time_evolve_naive: memory check",
         extra={"context": {
-            "n_qubits": hamiltonian.num_qubits,
-            "matrix_dim": 2 ** hamiltonian.num_qubits,
-            "time": time,
+            "n_qubits": n_qubits,
+            "matrix_dim": matrix_dim,
+            "estimated_bytes_needed": estimated_bytes_needed,
+            "available_bytes": available_bytes,
         }},
     )
 
-    try: 
-        # calculate eigenvector and eigenvalues of the Hamiltonian, not sparse because np.linalg.eigh does not support sparse matrices
-        H = hamiltonian.to_matrix()
-        log.debug("time_evolve_naive: densified Hamiltonian", extra={"context": {"H_shape": H.shape}})
-
-        eigenvals, eigenvecs = np.linalg.eigh(H)
-        log.debug("time_evolve_naive: eigendecomposition complete", extra={"context": {"n_eigenvalues": len(eigenvals)}})
-
-        # compute phase factors
-        phases = np.exp(-1j * eigenvals * time)
-        # Evolve initial state using unitary
-        unitary = eigenvecs @ np.diag(phases) @ eigenvecs.conj().T 
-        evolved_state = unitary @ initial_state
-
-        log.info(
-            "time_evolve_naive: complete",
-            extra={"context": {
-                "evolved_state_norm": float(np.linalg.norm(evolved_state)),
-        }},
+    if buffered_estimate > available_bytes:
+        raise ValueError(
+            f"time_evolve_naive: refusing to run for n_qubits={n_qubits} "
+            f"(matrix_dim={matrix_dim}). Estimated memory need "
+            f"({estimated_bytes_needed / 1e9:.2f} GB, with a "
+            f"{memory_buffer_qubits}-qubit safety buffer) exceeds available "
+            f"system memory ({available_bytes / 1e9:.2f} GB)."
         )
-    except Exception as e:
-        log.info("time_evolve_naive: failed", extra={"context": {"Number_of_qubits": hamiltonian.num_qubits, "Exception": e}})
 
-        #TODO: add fail loud option for when qubits are too many and the matrix is too large to compute
+    H = hamiltonian.to_matrix()
+    log.debug("time_evolve_naive: densified Hamiltonian", extra={"context": {"H_shape": H.shape}})
+
+    eigenvals, eigenvecs = np.linalg.eigh(H)
+    log.debug("time_evolve_naive: eigendecomposition complete", extra={"context": {"n_eigenvalues": len(eigenvals)}})
+
+    phases = np.exp(-1j * eigenvals * time)
+    unitary = eigenvecs @ np.diag(phases) @ eigenvecs.conj().T
+    evolved_state = unitary @ initial_state
+
+    log.info(
+        "time_evolve_naive: complete",
+        extra={"context": {"evolved_state_norm": float(np.linalg.norm(evolved_state))}},
+    )
 
     return unitary, evolved_state
+
+# def time_evolve_naive(hamiltonian: SparsePauliOp, initial_state, time: float):
+#     """
+#     Perform naive time evolution of a quantum system.
+
+#     Parameters
+#     ----------
+#     hamiltonian : SparsePauliOp
+#         The Hamiltonian object created using build_hamiltonian function from hamiltonian.py .
+#     initial_state : array-like
+#         The initial state of the quantum system.
+#     time : float
+#         The final simulation time.
+
+#     Returns
+#     -------
+#     unitary : array-like
+#         The unitary operator used for the evolution.
+#     evolved_state : array-like
+#         The evolved state of the quantum system.
+#     """
+#     log.info(
+#         "time_evolve_naive: starting",
+#         extra={"context": {
+#             "n_qubits": hamiltonian.num_qubits,
+#             "matrix_dim": 2 ** hamiltonian.num_qubits,
+#             "time": time,
+#         }},
+#     )
+
+#     try: 
+#         # calculate eigenvector and eigenvalues of the Hamiltonian, not sparse because np.linalg.eigh does not support sparse matrices
+#         H = hamiltonian.to_matrix()
+#         log.debug("time_evolve_naive: densified Hamiltonian", extra={"context": {"H_shape": H.shape}})
+
+#         eigenvals, eigenvecs = np.linalg.eigh(H)
+#         log.debug("time_evolve_naive: eigendecomposition complete", extra={"context": {"n_eigenvalues": len(eigenvals)}})
+
+#         # compute phase factors
+#         phases = np.exp(-1j * eigenvals * time)
+#         # Evolve initial state using unitary
+#         unitary = eigenvecs @ np.diag(phases) @ eigenvecs.conj().T 
+#         evolved_state = unitary @ initial_state
+
+#         log.info(
+#             "time_evolve_naive: complete",
+#             extra={"context": {
+#                 "evolved_state_norm": float(np.linalg.norm(evolved_state)),
+#         }},
+#         )
+#     except Exception as e:
+#         log.info("time_evolve_naive: failed", extra={"context": {"Number_of_qubits": hamiltonian.num_qubits, "Exception": e}})
+
+#         #TODO: add fail loud option for when qubits are too many and the matrix is too large to compute
+
+#     return unitary, evolved_state
 
 
 
@@ -183,7 +269,7 @@ def time_evolve_krylov(hamiltonian: SparsePauliOp, initial_state, time: float, k
 
 
 
-def time_evolve_randomized_krylov(hamiltonian, initial_state, time, krylov_dim, num_random_vectors,trunc=2, seed=67):
+def time_evolve_randomized_krylov(hamiltonian: SparsePauliOp, initial_state, time: float, krylov_dim: int, num_random_vectors: int ,trunc=2, seed=67, instrumental=False):
     """
     Perform time evolution using the randomized Krylov subspace method using the approach outlined by Güttel Schwarz: Güttel, S., & Schweitzer, M. (2023). *Randomized sketching for Krylov approximations of
     large-scale matrix functions.* SIAM Journal on Matrix Analysis and Applications.
@@ -330,11 +416,10 @@ def time_evolve_randomized_krylov(hamiltonian, initial_state, time, krylov_dim, 
     )
     if instrumental:
         return evolved_state, V, H_tilde
-    else:     
+    else: 
         return evolved_state
 
-
-def time_evolve_randomized_krylov_gaussian(hamiltonian, initial_state, time, krylov_dim, num_random_vectors, seed):
+def time_evolve_randomized_krylov_gaussian(hamiltonian: SparsePauliOp, initial_state, time: float, krylov_dim: int, num_random_vectors: int, seed=67):
     """
     Perform time evolution using the randomized Krylov subspace method with gaussian approach.
     Note: this was the initial approach for randomized Krylov but proved to be insufficient however it is kept for comparison reasons.
