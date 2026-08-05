@@ -1,6 +1,6 @@
 import numpy as np
 from qiskit import QuantumCircuit
-from qiskit.quantum_info import Statevector
+from qiskit.quantum_info import Statevector, SparsePauliOp
 from qiskit.circuit.library import PauliEvolutionGate
 from qiskit.synthesis import LieTrotter, SuzukiTrotter
 
@@ -9,22 +9,21 @@ from randquantkry.utils.logging_config import get_logger
 log = get_logger(__name__)
 
 
-def time_evolve_trotter(hamiltonian, initial_state, time, num_steps, order=1):
+def time_evolve_trotter(hamiltonian: SparsePauliOp, initial_state, time: float, num_steps: int, order=1):
     """
     Time evolution via Trotter-Suzuki product-formula approximation, using
     Qiskit's synthesis machinery.
 
-    NOTE: this is NOT an exact method -- it is a different APPROXIMATION
-    family from Krylov, converging to the true e^{-iHt} as num_steps -> inf
-    (or as `order` increases, for a fixed num_steps). Its value as a
-    comparison point is that it is literally the algorithm used to run time
-    evolution on real quantum hardware -- so it answers "how does classical
+    NOTE: this is a different approximation family from Krylov, converging to 
+    the true e^{-iHt} as num_steps -> inf. Its value as a comparison point is 
+    that it is literally the algorithm used to run time
+    evolution on real quantum hardware so it answers "how does classical
     Krylov reach compare to what a QPU would actually do", not "what is
     ground truth".
 
     IMPORTANT: PauliEvolutionGate's matrix/Statevector shortcuts (Operator(gate),
     Statevector.evolve(gate)) silently return the EXACT e^{-iHt} matrix,
-    ignoring the requested synthesis/num_steps entirely -- the Trotter
+    ignoring the requested synthesis/num_steps entirely, the Trotter
     approximation is only actually applied once the circuit is decomposed
     into elementary gates. This function decomposes explicitly for that
     reason; skipping that step would silently defeat the whole point of

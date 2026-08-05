@@ -12,14 +12,14 @@ from randquantkry.utils.logging_config import get_logger
 
 log = get_logger(__name__)
 
-def build_hamiltonian(n_qubits: int,  terms: list[tuple[str, int, float]], angle: float = 0.0) -> SparsePauliOp:
+def build_hamiltonian(n_qubits: int,  terms: list[tuple[str, int, float]]) -> SparsePauliOp:
     """
-    Build the Hamiltonian function from the given number of qubits.
+    Build the Hamiltonian function from the given number of qubits and gates. Currently implemented for 1D Hamiltonians.
 
     Parameters
     ----------
-    n_qubits : int
-        The number of qubits for the Hamiltonian.
+    n_qubits (int): The number of qubits for the Hamiltonian.
+
     terms (list): List of (gate, start_qubit, coeff) tuples. 
                 'gate' (str) defines the Pauli string (e.g., "XX").
                 'start_qubit' (int) is the index where the interaction begins.
@@ -35,6 +35,10 @@ def build_hamiltonian(n_qubits: int,  terms: list[tuple[str, int, float]], angle
     coefficients = []
 
     for gate, qubit, coeff in terms:
+        span = len(gate)
+        if qubit < 0 or qubit + span - 1 >= n_qubits:
+            raise ValueError(f"term {gate!r} at qubit {qubit} out of range for n_qubits={n_qubits}")
+        
         s = ['I'] * n_qubits
         
         s[(qubit)] = gate[0]
@@ -56,11 +60,31 @@ def build_hamiltonian(n_qubits: int,  terms: list[tuple[str, int, float]], angle
     return hamiltonian
 
 def build_initial_state(n_qubits=int, flipped_qubit=int):
+    """
+    Build the initial state for a certain number of qubits.
+    Warning: Currently only supports flipping one state.
+    """
     initial_state = np.zeros(2**n_qubits, dtype=complex)
     initial_state[flipped_qubit] = 1.0   # |0000...0>)
     return initial_state
 
-def reconstruct_hamiltonian(n_qubits: int, hamiltonian: SparsePauliOp):
+def reconstruct_hamiltonian(n_qubits: int, hamiltonian: SparsePauliOp)-> SparsePauliOp:
+    """
+    Rebuilds a hamiltonian with a certain number of qubits based on an input hamiltonian.
+    Function is used for constructing the same hamiltonain but with varying number of qubits for parameter study or benchmarking.
+    Parameters
+    ----------
+    n_qubits (int): The number of qubits for the Hamiltonian.
+
+    hamltonian (SparsePauliOp): Hamiltonian object constructed using build_hamiltonian function.
+
+    Returns
+    -------
+    SparsePauliOp
+        A SparsePauliOp object that represents the Hamiltonian function, which can be called with the state variables to compute the Hamiltonian matrix.
+    
+
+    """
     terms = []
     for pauli, coeff in zip(hamiltonian.paulis, hamiltonian.coeffs):
         label = str(pauli)

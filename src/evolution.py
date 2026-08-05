@@ -7,34 +7,29 @@
 
 # imports
 from tracemalloc import start
-
-from tracemalloc import start
-
 from scipy import linalg
 from scipy.linalg import expm, solve_triangular
 from scipy import sparse
 from scipy.fft import dct
 import numpy as np
 
-
+# imports from randquantkry
 from randquantkry.utils.logging_config import get_logger
 
 log = get_logger(__name__)
 
-MAX_NAIVE_QUBITS = 12
-
-def time_evolve_naive(hamiltonian, initial_state, time):
+def time_evolve_naive(hamiltonian: SparsePauliOp, initial_state, time: float):
     """
     Perform naive time evolution of a quantum system.
 
     Parameters
     ----------
-    hamiltonian : function
-        The Hamiltonian function.
+    hamiltonian : SparsePauliOp
+        The Hamiltonian object created using build_hamiltonian function from hamiltonian.py .
     initial_state : array-like
         The initial state of the quantum system.
     time : float
-        The evolution time.
+        The final simulation time.
 
     Returns
     -------
@@ -52,44 +47,47 @@ def time_evolve_naive(hamiltonian, initial_state, time):
         }},
     )
 
-    # calculate eigenvector and eigenvalues of the Hamiltonian, not sparse because np.linalg.eigh does not support sparse matrices
-    H = hamiltonian.to_matrix()
-    log.debug("time_evolve_naive: densified Hamiltonian", extra={"context": {"H_shape": H.shape}})
+    try: 
+        # calculate eigenvector and eigenvalues of the Hamiltonian, not sparse because np.linalg.eigh does not support sparse matrices
+        H = hamiltonian.to_matrix()
+        log.debug("time_evolve_naive: densified Hamiltonian", extra={"context": {"H_shape": H.shape}})
 
-    eigenvals, eigenvecs = np.linalg.eigh(H)
-    log.debug("time_evolve_naive: eigendecomposition complete", extra={"context": {"n_eigenvalues": len(eigenvals)}})
+        eigenvals, eigenvecs = np.linalg.eigh(H)
+        log.debug("time_evolve_naive: eigendecomposition complete", extra={"context": {"n_eigenvalues": len(eigenvals)}})
 
-    # compute phase factors
-    phases = np.exp(-1j * eigenvals * time)
-    # Evolve initial state using unitary
-    unitary = eigenvecs @ np.diag(phases) @ eigenvecs.conj().T 
-    evolved_state = unitary @ initial_state
+        # compute phase factors
+        phases = np.exp(-1j * eigenvals * time)
+        # Evolve initial state using unitary
+        unitary = eigenvecs @ np.diag(phases) @ eigenvecs.conj().T 
+        evolved_state = unitary @ initial_state
 
-    log.info(
-        "time_evolve_naive: complete",
-        extra={"context": {
-            "evolved_state_norm": float(np.linalg.norm(evolved_state)),
+        log.info(
+            "time_evolve_naive: complete",
+            extra={"context": {
+                "evolved_state_norm": float(np.linalg.norm(evolved_state)),
         }},
-    )
+        )
+    except Exception as e:
+        log.info("time_evolve_naive: failed", extra={"context": {"Number_of_qubits": hamiltonian.num_qubits, "Exception": e}})
 
-    #TODO: add fail loud option for when qubits are too many and the matrix is too large to compute
+        #TODO: add fail loud option for when qubits are too many and the matrix is too large to compute
 
     return unitary, evolved_state
 
 
 
-def time_evolve_krylov(hamiltonian, initial_state, time, krylov_dim):
+def time_evolve_krylov(hamiltonian: SparsePauliOp, initial_state, time: float, krylov_dim: int, instrumental=False):
     """
     Perform time evolution using the Krylov subspace method.
 
     Parameters
     ----------
-    hamiltonian : function
-        The Hamiltonian function.
+    hamiltonian : SparsePauliOp
+            The Hamiltonian object created using build_hamiltonian function from hamiltonian.py .
     initial_state : array-like
         The initial state of the quantum system.
     time : float
-        The evolution time.
+        The final evolution time.
     krylov_dim : int
         The dimension of the Krylov subspace.
 
@@ -178,18 +176,22 @@ def time_evolve_krylov(hamiltonian, initial_state, time, krylov_dim):
     )
 
     # TODO: add logging and fail loud option for when krylov_dim is too small and the approximation is not accurate enough
-    return evolved_state
+    if instrumental:
+        return evolved_state, V, Tri
+    else:
+        return evolved_state
 
 
 
-def time_evolve_randomized_krylov(hamiltonian, initial_state, time, krylov_dim, num_random_vectors,trunc=2, seed=67):
+def time_evolve_randomized_krylov(hamiltonian: SparsePauliOp, initial_state, time: float, krylov_dim: int, num_random_vectors: int ,trunc=2, seed=67, instrumental=False):
     """
-    Perform time evolution using the randomized Krylov subspace method.
+    Perform time evolution using the randomized Krylov subspace method using the approach outlined by Güttel Schwarz: Güttel, S., & Schweitzer, M. (2023). *Randomized sketching for Krylov approximations of
+    large-scale matrix functions.* SIAM Journal on Matrix Analysis and Applications.
 
     Parameters
     ----------
-    hamiltonian : function
-        The Hamiltonian function.
+    hamiltonian : SparsePauliOp
+            The Hamiltonian object created using build_hamiltonian function from hamiltonian.py .
     initial_state : array-like
         The initial state of the quantum system.
     time : float
@@ -197,9 +199,9 @@ def time_evolve_randomized_krylov(hamiltonian, initial_state, time, krylov_dim, 
     krylov_dim : int
         The dimension of the Krylov subspace.
     num_random_vectors : int
-        The number of random vectors to use in the randomized Krylov method.
+        The number of random vectors to use in the randomized Krylov method that span the randomly sampled subspace. Recommended: 2*krylov_dim +1
     trunc : int, optional
-        The truncation parameter for the randomized Krylov method.
+        The truncation parameter for the randomized Krylov method aka against how many basis vectors krylov should still reorthogonalize.
     seed : int, optional
         Seed for numpy's global RNG before the randomized method runs, so
         results are reproducible run-to-run.
@@ -216,6 +218,8 @@ def time_evolve_randomized_krylov(hamiltonian, initial_state, time, krylov_dim, 
             "time": time,
             "krylov_dim_requested": krylov_dim,
             "num_random_vectors": num_random_vectors,
+            "trunc": trunc,
+            "seed": seed,
         }},
     )
 
@@ -223,14 +227,15 @@ def time_evolve_randomized_krylov(hamiltonian, initial_state, time, krylov_dim, 
     v = initial_state / np.linalg.norm(initial_state)
     V = [v]  # list to store Krylov vectors
 
-    rng = np.random.default_rng(seed) # not 42, this is for my gen z audience, 
+    rng = np.random.default_rng(seed) # not 42, this is for my gen z audience
     N = 2 ** hamiltonian.num_qubits # dimension of the Hilbert space
     s = num_random_vectors # sketch dimension
     
     e = rng.choice([-1.0, 1.0], size=N)
     d_idx = rng.choice(N, size=s, replace=False)
     scale = np.sqrt(N / s)
-    # Random matrix using S= @(M) sqrt(N/s)*(D*(dct(E*M))) from Gürtel Schwarz
+
+    # Random matrix using S= @(M) sqrt(N/s)*(D*(dct(E*M))) from Güttel Schwarz
     def S(M):
         if M.ndim > 1:
             EM = e[:, None] * M
@@ -292,11 +297,10 @@ def time_evolve_randomized_krylov(hamiltonian, initial_state, time, krylov_dim, 
 
 
     # assemble the tridiagonal matrix
-    
-    k = len(V) - 1                       # number of accepted Krylov vectors
+    k = len(V) - 1
     Sb = S(v)
-    SV_mat = np.array(SV[:k]).T           # s x k
-    SAV_mat = np.array(SAV[:k]).T         # s x k  (you'll need to build SAV the same way as SV -- see note below)
+    SV_mat = np.array(SV[:k]).T          
+    SAV_mat = np.array(SAV[:k]).T         
 
     Q, R = np.linalg.qr(SV_mat)
     SVw = Q
@@ -305,6 +309,12 @@ def time_evolve_randomized_krylov(hamiltonian, initial_state, time, krylov_dim, 
     M = SVw.conj().T @ SVw
     M_pinv = np.linalg.pinv(M)
     H_tilde = M_pinv @ (SVw.conj().T @ SAVw)
+    log.info(
+    "time_evolve_randomized_krylov: H_tilde built",
+    extra={"context": {
+        "H_tilde_hermitian_deviation": float(np.max(np.abs(H_tilde - H_tilde.conj().T))),
+    }},
+    )
     c_b = M_pinv @ (SVw.conj().T @ Sb)
 
     coeffs = expm(-1j * H_tilde * time) @ c_b
@@ -318,18 +328,19 @@ def time_evolve_randomized_krylov(hamiltonian, initial_state, time, krylov_dim, 
             "evolved_state_norm": float(np.linalg.norm(evolved_state)),
         }},
     )
+    if instrumental:
+        return evolved_state, V, H_tilde
+    else: 
+        return evolved_state
 
-    return evolved_state
-
-
-def time_evolve_randomized_krylov_gaussian(hamiltonian, initial_state, time, krylov_dim, num_random_vectors, seed):
+def time_evolve_randomized_krylov_gaussian(hamiltonian: SparsePauliOp, initial_state, time: float, krylov_dim: int, num_random_vectors: int, seed=67):
     """
-    Perform time evolution using the randomized Krylov subspace method.
-
+    Perform time evolution using the randomized Krylov subspace method with gaussian approach.
+    Note: this was the initial approach for randomized Krylov but proved to be insufficient however it is kept for comparison reasons.
     Parameters
     ----------
-    hamiltonian : function
-        The Hamiltonian function.
+    hamiltonian : SparsePauliOp
+            The Hamiltonian object created using build_hamiltonian function from hamiltonian.py .
     initial_state : array-like
         The initial state of the quantum system.
     time : float
@@ -446,14 +457,14 @@ def time_evolve_randomized_krylov_gaussian(hamiltonian, initial_state, time, kry
 
 
 
-def time_evolve_randomized_krylov_gramschmidt(hamiltonian, initial_state, time, krylov_dim, num_random_vectors, seed):
+def time_evolve_randomized_krylov_gramschmidt(hamiltonian: SparsePauliOp, initial_state, time: float, krylov_dim: int, num_random_vectors: int, seed=67):
     """
-    Perform time evolution using the randomized Krylov subspace method.
+    Perform time evolution using the randomized Krylov subspace method using a randomized gram schmidt appraoch by Balabanov, O., & Grigori, L. (2022). *Randomized Gram-Schmidt process with application to GMRES.*
 
     Parameters
     ----------
-    hamiltonian : function
-        The Hamiltonian function.
+    hamiltonian : SparsePauliOp
+            The Hamiltonian object created using build_hamiltonian function from hamiltonian.py .
     initial_state : array-like
         The initial state of the quantum system.
     time : float

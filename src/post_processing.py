@@ -35,6 +35,7 @@ METHOD_STYLE = {
     "trotter": {"color": "#C2496D", "marker": "v", "linestyle": "-.", "label": "Trotter"},
 }
 
+METHOD_ORDER = ["naive", "krylov", "randomized_krylov"]
 
 def _apply_base_style(ax, xlabel, ylabel, title):
     """Shared visual styling: consistent typography, subtle grid, clean spines."""
@@ -46,7 +47,6 @@ def _apply_base_style(ax, xlabel, ylabel, title):
     ax.spines["right"].set_visible(False)
     ax.tick_params(labelsize=10)
 
-
 def _filtered_xy(n_qubits, values):
     """Drop (x, y) pairs where y is None -- these mark methods that were
     infeasible/skipped at that n_qubits (e.g. naive above MAX_QUBITS_DENSE),
@@ -57,34 +57,97 @@ def _filtered_xy(n_qubits, values):
     xs, ys = zip(*pairs)
     return list(xs), list(ys)
 
+def _df_to_results(df, x="n_qubits", y_col="memory_gb", hue="method"):
+    """Convert a parameter_study()-style DataFrame into the {label: {x: [...], y_col: [...]}}
+    shape that plot_memory's plotting loop expects."""
+    data = df.copy()
 
-def plot_runtime(results, methods=None, title="Runtime vs. System Size", save_path=None, figsize=(8, 5.5)):
+    if hue == "method" and "s_ratio" in data.columns:
+        def make_label(row):
+            if pd.isna(row["s_ratio"]):
+                return row["method"]
+            return f"{row['method']} (s_ratio={row['s_ratio']})"
+        data["_hue_label"] = data.apply(make_label, axis=1)
+        hue_col = "_hue_label"
+    else:
+        hue_col = hue
+
+    results = {}
+    for label, group in data.groupby(hue_col):
+        group_sorted = group.sort_values(x)
+        results[label] = {
+            "n_qubits": group_sorted[x].tolist(),
+            y_col: group_sorted[y_col].tolist(),
+            "_base_method": group_sorted["method"].iloc[0] if "method" in group_sorted else label,
+        }
+    return results
+
+def _sort_labels(results, order=METHOD_ORDER):
+    """Sort result labels by canonical method order, unknown methods last."""
+    def rank(label):
+        base = results[label].get("_base_method", label)
+        try:
+            return (order.index(base), label)
+        except ValueError:
+            return (len(order), label)
+    return sorted(results.keys(), key=rank)
+
+def plot_runtime(results=None, df=None, x="n_qubits", hue="method", methods=None,
+                  title="Runtime vs. System Size", save_path=None, figsize=(8, 5.5)):
     """
     Plot wall-clock runtime vs. n_qubits for each method.
 
     Parameters
     ----------
-    results : dict
-        Output of QuantumBenchmark.benchmark_runtime():
-        {method: {"n_qubits": [...], "runtime_sec": [...]}}.
+    results : dict, optional
+        Legacy input: {method: {"n_qubits": [...], "runtime_sec": [...]}}.
+        Provide either `results` or `df`, not both.
+    df : pandas.DataFrame, optional
+        Same shape as the DataFrame used by plot_parameter_study -- one row
+        per (method, n_qubits[, s_ratio]) combination, with a runtime_sec column.
+        If given, it's grouped the same way plot_parameter_study groups its
+        `hue` column (method, or "method (s_ratio=...)" when s_ratio varies).
+    x : str, default "n_qubits"
+        Column in `df` to use as the x-axis (only used when `df` is given).
+    hue : str, default "method"
+        Column in `df` to group/color by (only used when `df` is given).
     methods : list of str, optional
         Subset of results.keys() to plot; defaults to all methods present.
     save_path : str, optional
         If given, saves the figure (and does not display it inline).
     """
-    # configure_logging(console_level="INFO")
-    fig, ax = plt.subplots(figsize=figsize)
-    methods = methods if methods is not None else list(results.keys())
+    if results is None and df is None:
+        raise ValueError("Provide either `results` or `df`.")
 
-    for method in methods:
-        if method not in results:
+    key = "runtime_sec"
+
+    if df is not None:
+        results = _df_to_results(df, x=x, y_col=key, hue=hue)
+
+    fig, ax = plt.subplots(figsize=figsize)
+    plot_labels = methods if methods is not None else _sort_labels(results)
+
+    app = {
+        "naive": "",
+        "krylov": " (k_dim = 40)",
+        "randomized_krylov": " (nrv = 80)",
+    }
+
+    for label in plot_labels:
+        if label not in results or key not in results[label]:
             continue
-        style = METHOD_STYLE.get(method, {"color": "gray", "marker": "o", "linestyle": "-", "label": method})
-        xs, ys = _filtered_xy(results[method]["n_qubits"], results[method]["runtime_sec"])
+
+        base_method = results[label].get("_base_method", label)
+        style = METHOD_STYLE.get(base_method, {"color": "gray", "marker": "o", "linestyle": "-"})
+
+        display_label = f"{base_method}{app[base_method]}" if base_method in app and label == base_method else label
+
+        xs, ys = _filtered_xy(results[label]["n_qubits"], results[label][key])
         if not xs:
             continue
         ax.plot(xs, ys, color=style["color"], marker=style["marker"], linestyle=style["linestyle"],
-                 label=style["label"], linewidth=2.2, markersize=7, markeredgecolor="white", markeredgewidth=0.8)
+                 label=display_label, linewidth=2.2, markersize=7,
+                 markeredgecolor="white", markeredgewidth=0.8)
 
     ax.set_yscale("log")
     _apply_base_style(ax, xlabel="Number of Qubits", ylabel="Runtime (seconds, log-scale)", title=title)
@@ -92,59 +155,79 @@ def plot_runtime(results, methods=None, title="Runtime vs. System Size", save_pa
     plt.tight_layout()
 
     if save_path:
-                target_dir = Path(save_path) / "plots"
-                target_dir.mkdir(
-                    parents=True, exist_ok=True
-                ) 
-    
-                filename = f"Runtime_vs_SystemSize.png"
-        
-                target_save_path = target_dir / filename
-        
-    if target_save_path:
+        target_dir = Path(save_path) / "plots"
+        target_dir.mkdir(parents=True, exist_ok=True)
+        target_save_path = target_dir / "Runtime_vs_SystemSize.png"
         plt.savefig(target_save_path, dpi=150, bbox_inches="tight")
         log.info("Plot saved", extra={"context": {"target_path": target_save_path}})
         plt.close(fig)
-    
 
     plt.show()
-
     return fig
 
 
-def plot_memory(results, methods=None, ram_limits=None,
+def plot_memory(results=None, df=None, x="n_qubits", hue="method", methods=None,
+                 ram_limits=None,
                  title="Quantum Complexity Walls: Memory vs. System Size",
-                 save_path=None, figsize=(8, 5.5), empirical=False):
+                 save_path=None, figsize=(8, 5.5), memory_rss=False):
     """
     Plot memory (GB) vs. n_qubits for each method.
 
     Parameters
     ----------
-    results : dict
-        Output of QuantumBenchmark.benchmark_memory():
-        {method: {"n_qubits": [...], "memory_gb": [...], ("memory_gb_measured": [...])}}.
+    results : dict, optional
+        Legacy input: {method: {"n_qubits": [...], "memory_gb": [...], ...}}.
+        Provide either `results` or `df`, not both.
+    df : pandas.DataFrame, optional
+        Same shape as the DataFrame used by plot_parameter_study -- one row
+        per (method, n_qubits[, s_ratio]) combination, with a memory column.
+        If given, it's grouped the same way plot_parameter_study groups its
+        `hue` column (method, or "method (s_ratio=...)" when s_ratio varies).
+    x : str, default "n_qubits"
+        Column in `df` to use as the x-axis (only used when `df` is given).
+    hue : str, default "method"
+        Column in `df` to group/color by (only used when `df` is given).
     ram_limits : dict, optional
-        {"label": gb_value} horizontal reference lines, e.g.
-        {"Typical PC RAM: 16GB": 16, "Typical HPC RAM: 512GB": 512}
-        -- matches the style of common "complexity wall" reference plots.
-    empirical : bool, default False
-        If True, plot the empirically-MEASURED memory (memory_gb_measured)
-        instead of the theoretical estimate -- only valid if the results
-        dict was produced with benchmark_memory(empirical=True).
+        {"label": gb_value} horizontal reference lines.
+    memory_rss : bool, default False
+        If False, use the memory column ("memory_gb_measured")
+        instead of ("memory_rss").
     """
-    fig, ax = plt.subplots(figsize=figsize)
-    methods = methods if methods is not None else list(results.keys())
-    key = "memory_gb_measured" if empirical else "memory_gb"
+    if results is None and df is None:
+        raise ValueError("Provide either `results` or `df`.")
 
-    for method in methods:
-        if method not in results or key not in results[method]:
+    key = "memory_gb" if not memory_rss else "memory_rss"
+
+    if df is not None:
+        results = _df_to_results(df, x=x, y_col=key, hue=hue)
+
+    fig, ax = plt.subplots(figsize=figsize)
+    plot_labels = methods if methods is not None else _sort_labels(results)
+
+    app = {
+        "naive": "",
+        "krylov": " (k_dim = 40)",
+        "randomized_krylov": " (nrv = 80)",
+    }
+
+    for label in plot_labels:
+        if label not in results or key not in results[label]:
             continue
-        style = METHOD_STYLE.get(method, {"color": "gray", "marker": "o", "linestyle": "-", "label": method})
-        xs, ys = _filtered_xy(results[method]["n_qubits"], results[method][key])
+
+        base_method = results[label].get("_base_method", label)
+        style = METHOD_STYLE.get(base_method, {"color": "gray", "marker": "o", "linestyle": "-"})
+
+        # Only apply the hardcoded DIM/NRV suffix for a plain method name with
+        # no per-row s_ratio already baked into the label (df path supplies its
+        # own, more accurate, "(s_ratio=...)" suffix when relevant).
+        display_label = f"{base_method}{app[base_method]}" if base_method in app and label == base_method else label
+
+        xs, ys = _filtered_xy(results[label]["n_qubits"], results[label][key])
         if not xs:
             continue
         ax.plot(xs, ys, color=style["color"], marker=style["marker"], linestyle=style["linestyle"],
-                 label=style["label"], linewidth=2.2, markersize=7, markeredgecolor="white", markeredgewidth=0.8)
+                 label=display_label, linewidth=2.2, markersize=7,
+                 markeredgecolor="white", markeredgewidth=0.8)
 
     if ram_limits:
         for label, gb_value in ram_limits.items():
@@ -153,29 +236,20 @@ def plot_memory(results, methods=None, ram_limits=None,
                      color="firebrick", fontsize=9, va="center", ha="left")
 
     ax.set_yscale("log")
-    ylabel = "Memory (Gigabytes, log-scale)" + (" -- measured" if empirical else " -- theoretical")
+    ylabel = "Memory (Gigabytes, log-scale)" + (" -- memory_tmalloc" if not memory_rss else " -- memory_rss")
     _apply_base_style(ax, xlabel="Number of Qubits", ylabel=ylabel, title=title)
     ax.legend(fontsize=10, frameon=True, framealpha=0.9, loc="upper left")
     plt.tight_layout()
 
     if save_path:
-            target_dir = Path(save_path) / "plots"
-            target_dir.mkdir(
-                parents=True, exist_ok=True
-            )  # Creates run_dir/plots if missing
-
-            filename = f"Memory_vs_SystemSize.png"
-    
-            target_save_path = target_dir / filename
-    
-    if target_save_path:
+        target_dir = Path(save_path) / "plots"
+        target_dir.mkdir(parents=True, exist_ok=True)
+        target_save_path = target_dir / "Memory_vs_SystemSize.png"
         plt.savefig(target_save_path, dpi=150, bbox_inches="tight")
         log.info("Plot saved", extra={"context": {"target_path": target_save_path}})
         plt.close(fig)
 
     plt.show()
-
-
     return fig
 
 
@@ -307,7 +381,5 @@ def plot_parameter_study(
         plt.show()
         log.info("No save path given so no plot saved")
 
-    
-    
 
     return fig

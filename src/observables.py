@@ -257,11 +257,11 @@ def plot_operator_sparsity(
 
     ax.set_title(
         title or f"{default_title}\n({dim_i}x{dim_j} Matrix)",
-        fontsize=12,
+        fontsize=16,
         fontweight="bold",
     )
-    ax.set_xlabel(xlabel, fontsize=10)
-    ax.set_ylabel(ylabel, fontsize=10)
+    ax.set_xlabel(xlabel, fontsize=14)
+    ax.set_ylabel(ylabel, fontsize=14)
 
     plt.tight_layout()
 
