@@ -183,7 +183,7 @@ def time_evolve_krylov(hamiltonian: SparsePauliOp, initial_state, time: float, k
 
 
 
-def time_evolve_randomized_krylov(hamiltonian: SparsePauliOp, initial_state, time: float, krylov_dim: int, num_random_vectors: int ,trunc=2, seed=67, instrumental=False):
+def time_evolve_randomized_krylov(hamiltonian, initial_state, time, krylov_dim, num_random_vectors,trunc=2, seed=67):
     """
     Perform time evolution using the randomized Krylov subspace method using the approach outlined by Güttel Schwarz: Güttel, S., & Schweitzer, M. (2023). *Randomized sketching for Krylov approximations of
     large-scale matrix functions.* SIAM Journal on Matrix Analysis and Applications.
@@ -330,10 +330,11 @@ def time_evolve_randomized_krylov(hamiltonian: SparsePauliOp, initial_state, tim
     )
     if instrumental:
         return evolved_state, V, H_tilde
-    else: 
+    else:     
         return evolved_state
 
-def time_evolve_randomized_krylov_gaussian(hamiltonian: SparsePauliOp, initial_state, time: float, krylov_dim: int, num_random_vectors: int, seed=67):
+
+def time_evolve_randomized_krylov_gaussian(hamiltonian, initial_state, time, krylov_dim, num_random_vectors, seed):
     """
     Perform time evolution using the randomized Krylov subspace method with gaussian approach.
     Note: this was the initial approach for randomized Krylov but proved to be insufficient however it is kept for comparison reasons.

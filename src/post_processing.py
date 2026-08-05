@@ -14,14 +14,16 @@ re-running a sweep, and benchmark.py stays free of any matplotlib dependency
 
 # imports
 import matplotlib.pyplot as plt
-from .benchmark import Benchmark
 from pathlib import Path
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from randquantkry.utils.logging_config import get_logger, configure_logging
+from pathlib import Path
+import pandas as pd
+import matplotlib.pyplot as plt
+from scipy.linalg import expm
 
- 
+from randquantkry.utils.logging_config import get_logger
 log = get_logger(__name__)
 
 # One consistent color/marker/linestyle per method, reused across every plot
@@ -251,6 +253,78 @@ def plot_memory(results=None, df=None, x="n_qubits", hue="method", methods=None,
 
     plt.show()
     return fig
+
+# def plot_memory(results, methods=None, ram_limits=None,
+#                  title="Quantum Complexity Walls: Memory vs. System Size",
+#                  save_path=None, figsize=(8, 5.5), empirical=False):
+#     """
+#     Plot memory (GB) vs. n_qubits for each method.
+
+#     Parameters
+#     ----------
+#     results : dict
+#         Output of QuantumBenchmark.benchmark_memory():
+#         {method: {"n_qubits": [...], "memory_gb": [...], ("memory_gb_measured": [...])}}.
+#     ram_limits : dict, optional
+#         {"label": gb_value} horizontal reference lines, e.g.
+#         {"Typical PC RAM: 16GB": 16, "Typical HPC RAM: 512GB": 512}
+#         -- matches the style of common "complexity wall" reference plots.
+#     empirical : bool, default False
+#         If True, plot the empirically-MEASURED memory (memory_gb_measured)
+#         instead of the theoretical estimate -- only valid if the results
+#         dict was produced with benchmark_memory(empirical=True).
+#     """
+#     fig, ax = plt.subplots(figsize=figsize)
+#     methods = methods if methods is not None else list(results.keys())
+#     key = "memory_gb_measured" if empirical else "memory_gb"
+
+#     for method in methods:
+#         app = {
+#                     'naive': "",
+#                     'krylov': " (DIM = 40)",
+#                     'randomized_krylov': " (NRV = 80)"
+#                 }
+#         label = f"{method}{app[method]}"
+#         if method not in results or key not in results[method]:
+#             continue
+#         style = METHOD_STYLE.get(method, {"color": "gray", "marker": "o", "linestyle": "-", "label": label})
+#         xs, ys = _filtered_xy(results[method]["n_qubits"], results[method][key])
+#         if not xs:
+#             continue
+#         ax.plot(xs, ys, color=style["color"], marker=style["marker"], linestyle=style["linestyle"],
+#                  label=style["label"], linewidth=2.2, markersize=7, markeredgecolor="white", markeredgewidth=0.8)
+
+#     if ram_limits:
+#         for label, gb_value in ram_limits.items():
+#             ax.axhline(gb_value, color="firebrick", linestyle="--", linewidth=1.5, alpha=0.8)
+#             ax.text(ax.get_xlim()[1] if ax.get_xlim()[1] > 0 else 1, gb_value, f"  {label}",
+#                      color="firebrick", fontsize=9, va="center", ha="left")
+
+#     ax.set_yscale("log")
+#     ylabel = "Memory (Gigabytes, log-scale)" + (" -- measured" if empirical else " -- theoretical")
+#     _apply_base_style(ax, xlabel="Number of Qubits", ylabel=ylabel, title=title)
+#     ax.legend(fontsize=10, frameon=True, framealpha=0.9, loc="upper left")
+#     plt.tight_layout()
+
+#     if save_path:
+#             target_dir = Path(save_path) / "plots"
+#             target_dir.mkdir(
+#                 parents=True, exist_ok=True
+#             )  # Creates run_dir/plots if missing
+
+#             filename = f"Memory_vs_SystemSize.png"
+    
+#             target_save_path = target_dir / filename
+    
+#     if target_save_path:
+#         plt.savefig(target_save_path, dpi=150, bbox_inches="tight")
+#         log.info("Plot saved", extra={"context": {"target_path": target_save_path}})
+#         plt.close(fig)
+
+#     plt.show()
+
+
+#     return fig
 
 
 def plot_parameter_study(

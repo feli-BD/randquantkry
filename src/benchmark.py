@@ -11,6 +11,7 @@ import tracemalloc
 import pandas as pd
 from pathlib import Path
 from qiskit.quantum_info import SparsePauliOp
+import psutil, os, threading
 
 # randquantkry imports
 from .evolution import (
@@ -127,8 +128,10 @@ class Benchmark:
             if hamiltonian.num_qubits <= MAX_NAIVE_QUBITS:
                 unitary, state = time_evolve_naive(hamiltonian, initial_state, time)
             else:
-                log.info(" 'naive' skipped to prevent memory overload due to too many qubits: ", extra={"context": {
-                    "n_qubits": self.H.num_qubits }} )
+                log.info("'naive' skipped...", extra={"context": {"n_qubits": hamiltonian.num_qubits}})
+                raise ValueError(
+                    f"naive method requires n_qubits <= {MAX_NAIVE_QUBITS}, got {hamiltonian.num_qubits}"
+                )
         elif method == "krylov":
             state = time_evolve_krylov(hamiltonian, initial_state, time, krylov_dim)
         elif method == "randomized_krylov":
@@ -341,22 +344,36 @@ class Benchmark:
             result["total_gb_randomized"] = sparse_H_gb + V_gb + sketch_storage_gb
     
         return result
+
+
+
+    def _measure_with_rss(fn, *args, **kwargs):
+        process = psutil.Process(os.getpid())
+        peak = [process.memory_info().rss]
+        stop = threading.Event()
+        def sampler():
+            while not stop.is_set():
+                peak[0] = max(peak[0], process.memory_info().rss)
+        t = threading.Thread(target=sampler); t.start()
+        t0 = perf_counter()
+        result = fn(*args, **kwargs)
+        runtime = perf_counter() - t0
+        stop.set(); t.join()
+        return result, runtime, peak[0]
         
 
-    def benchmark(self, n_qubits_list: int , methods=None):
+    def benchmark(self, n_qubits_list, methods=None):
         """
         Combined runtime + memory sweep. Runs each (n_qubits, method) point ONCE,
-        recording wall-clock runtime and theoretical memory always, plus
-        empirically-measured peak memory if empirical_memory=True.
+        recording wall-clock runtime and theoretical memory always.
 
         Returns a single results dict compatible with BOTH plot_runtime(results)
         and plot_memory(results) -- no need to run the sweep twice to get both plots.
 
-        NOTE: when empirical_memory=True, tracemalloc's own tracing overhead adds
+        NOTE: tracemalloc's own tracing overhead adds
         a small, real bias to the measured runtime_sec for that run. If you need
         a clean runtime number AND empirical memory, prefer two separate calls
-        (empirical_memory=False for timing, True for memory) rather than reading
-        runtime_sec from an empirical=True run.
+        rather than reading runtime_sec from an empirical=True run.
         """
         methods = methods or self.methods
         seed_val = self.seed
@@ -375,7 +392,11 @@ class Benchmark:
             "n_qubits_list": list(n_qubits_list), "methods": methods
         }})
 
-        results = {method: {"n_qubits": [], "state": [], "runtime_sec": [], "memory_gb_measured": []} for method in methods}
+        results = {method: {"n_qubits": [], "state": [], "runtime_sec": [], "memory_gb": []} for method in methods}
+        if empirical_memory:
+            for m in methods:
+                results[m]["memory_gb_measured"] = []
+                results[m]["memory_rss"] = []
 
         for n_qubits in n_qubits_list:
             hamiltonian, initial_state, krylov_dim, number_rand_vectors = self._adjust_run_nqubits(n_qubits)
@@ -388,11 +409,27 @@ class Benchmark:
                 measured_mem_gb = None
                 try:
                     tracemalloc.start()
-                    state, runtime = self._run_method(method, hamiltonian, initial_state, self.time, krylov_dim, number_rand_vectors)
-                    _, peak = tracemalloc.get_traced_memory()
+                    process = psutil.Process(os.getpid())
+                    rss_baseline = process.memory_info().rss
+                    peak_rss = [rss_baseline]
+                    stop = threading.Event()
+                    def sampler():
+                        while not stop.is_set():
+                            peak_rss[0] = max(peak_rss[0], process.memory_info().rss)
+                    t = threading.Thread(target=sampler)
+                    t.start()
+
+                    state, runtime = self._run_method(method, hamiltonian, psi0, self.time, kdim, nrv)
+
+                    stop.set()
+                    t.join()
+                    _, tracemalloc_peak = tracemalloc.get_traced_memory()
                     tracemalloc.stop()
-                    measured_mem_gb = peak / 1e9
+
+                    measured_mem_gb = tracemalloc_peak / 1e9
                     results[method]["memory_gb_measured"].append(measured_mem_gb)
+                    results[method]["memory_rss"].append(peak_rss[0]/1e9)
+
                     results[method]["runtime_sec"].append(runtime)
                     results[method]["state"].append(state)
                     row = {
@@ -403,6 +440,7 @@ class Benchmark:
                         "num_random_vectors": number_rand_vectors if "randomized" in method else None,
                         "runtime_sec": runtime,
                         "memory_gb_measured": measured_mem_gb,
+                        "memory_rss": peak_rss[0],
                         "evolved_state_norm": float(np.linalg.norm(state)) if state is not None else None,
                     }
                     append_result_row(run_dir, row)
@@ -411,7 +449,6 @@ class Benchmark:
                         "method": method, "n_qubits": n_qubits, "runtime_sec": runtime
                     }})
 
-
                 except Exception as e:
                     log.warning("benchmark: method failed, recording None", extra={"context": {
                         "method": method, "n_qubits": n_qubits, "error": str(e)
@@ -419,10 +456,12 @@ class Benchmark:
                     results[method]["runtime_sec"].append(None)
                     results[method]["state"].append(None)
                     results[method]["memory_gb_measured"].append(None)
+                    results[method]["memory_rss"].append(None)
                     try:
                         tracemalloc.stop()
                     except Exception:
                         pass
+
                     # Record failed 
                     error_row = {
                         "n_qubits": n_qubits,
