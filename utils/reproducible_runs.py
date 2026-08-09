@@ -85,6 +85,27 @@ def _get_blas_backend_info():
         "lapack": config.get("Build Dependencies", {}).get("lapack", {}).get("name", "unknown"),
     }
 
+def _method_shorthand(methods):
+    """Build a short, readable tag from a list of method names."""
+    shorthand_map = {
+        "naive": "nv",
+        "krylov": "kry",
+        "randomized_krylov": "rkry",
+        "randomized_krylov_gaussian": "rkryg",
+        "trotter": "trot",
+    }
+    tags = [shorthand_map.get(m, m[:4]) for m in methods]  # fallback: first 4 chars of unknown methods
+    return "-".join(tags)
+
+
+def _qubit_range_shorthand(n_qubits_list):
+    """Build a compact qubit-range tag, e.g. [4,6,8,10] -> 'q4-10'."""
+    if not n_qubits_list:
+        return "qNA"
+    lo, hi = min(n_qubits_list), max(n_qubits_list)
+    return f"q{lo}" if lo == hi else f"q{lo}-{hi}"
+
+
 def start_run(output_dir, run_config):
     """
     Create a new timestamped run directory and write its metadata.json.
@@ -92,28 +113,42 @@ def start_run(output_dir, run_config):
     Parameters
     ----------
     output_dir : str or Path
-        Parent directory to create the timestamped run folder inside.
+        Parent directory to create the run folder inside.
     run_config : dict
         Everything needed to reproduce this run -- sweep lists, methods,
         seed, etc. Stored verbatim in metadata.json, alongside auto-captured
         package versions and (if available) the current git commit hash.
+        Used here to build a readable run_id: run_id is built from
+        run_config["methods"] and run_config["n_qubits_list"] when present
+        (falling back to generic tags if either is missing, so this stays
+        safe for config shapes that don't include them).
 
     Returns
     -------
     Path
-        The created run directory (e.g. results/run_20260721T143205Z/).
+        The created run directory, e.g.
+        results/run_kry-rkry_q4-10_20260721T143205Z/
     """
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    run_dir = Path(output_dir) / f"run_{timestamp}"
+
+    methods = run_config.get("methods", [])
+    n_qubits_list = run_config.get("n_qubits_list", [])
+
+    method_tag = _method_shorthand(methods) if methods else "nomethod"
+    qubit_tag = _qubit_range_shorthand(n_qubits_list) if n_qubits_list else "qNA"
+
+    run_id = f"run_{method_tag}_{qubit_tag}_{timestamp}"
+    run_dir = Path(output_dir) / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
 
     metadata = {
+        "run_id": run_id,
         "timestamp_utc": datetime.now(timezone.utc).isoformat(),
         "run_config": run_config,
         "environment": _get_environment_metadata(),
         "package_versions": _get_package_versions(),
         "git_commit": _get_git_commit(),
-        "hardware": _get_hardware()
+        "hardware": _get_hardware(),
     }
     with open(run_dir / "metadata.json", "w") as f:
         json.dump(metadata, f, indent=2, default=str)
