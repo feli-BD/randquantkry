@@ -2,8 +2,9 @@
 
 **A RandNLA-accelerated Krylov subspace solver for quantum time evolution.**
 
+<!-- ![Krylov Convergence](docs/output/multi_k_psi_convergence.gif) -->
 <p align="center">
-  <img src="docs/output/Memory20qs.png" alt="Memory vs. System Size" width="500">
+  <img src="docs/output/multi_k_psi_convergence_rotate.gif" width="600" alt="Krylov Convergence">
 </p>
 
 Simulating quantum dynamics classically hits an exponential wall: the state vector of an
@@ -15,10 +16,15 @@ that reach is bounded by the same physics that governs the problem in the first 
 fast information spreads through a local Hamiltonian, which in turn sets how large a Krylov
 subspace is actually needed for a given system size and simulation time.
 
+<p align="center">
+  <img src="docs/output/Memory20qs.png" alt="Memory vs. System Size" width="500">
+</p>
+
+
 Rather than diagonalizing a dense N×N matrix (`naive`) or paying full O(m²N) reorthogonalization
 costs (`krylov`), this package builds Krylov subspaces using **sparse matrix-vector products**
-and a **fast randomized sketch** (Güttel & Schweitzer's sketched-FOM, with a truncated
-reorthogonalization made numerically safe by a periodic sketch-based correction). 
+and a **fast randomized sketch** (`randomized krylov`) using Güttel & Schweitzer's sketched-FOM, with a truncated
+reorthogonalization made numerically safe by a periodic sketch-based correction. 
 
 ## Key features
 
@@ -94,6 +100,22 @@ For hands-on, step-by-step introductions to the package, explore the interactive
 
 4. **[`scripts/tutorial_parameter_study.ipynb`](scripts/tutorial_parameter_study.ipynb)** - **Parameter Sweeps & Analysis**: How to run multi-variable parameter grids, save structured run artifacts, load JSONL logs, and plot post-processing metrics.
 
+5. **[`scripts/tutorial_visualizations.ipynb`](scripts/tutorial_visualizations.ipynb)** - **Fun Visuals for Parameter Study**: How to create bubble plots and video convergence studies.
+
+<table align="center">
+  <tr>
+    <td align="center" width="45%">
+      <img src="docs/output/Krylov_err_vs_time.png" alt="Bubble Plot Parameter Study Krylov" width="100%">
+    </td>
+    <td align="center" width="45%">
+      <img src="docs/output/multi_k_psi_convergence.gif" alt="Krylov Convergence Study" width="100%">
+      <br><br>
+      <img src="docs/output/rel_error_convergence.gif" alt="Krylov Convergence Study Relative Error" width="100%">
+    </td>
+  </tr>
+</table>
+
+
 ## Project structure
 
 ```
@@ -103,16 +125,17 @@ randquantkry/
 │   ├── evolution.py         # naive, krylov, randomized_krylov(_gaussian)
 │   ├── trotter.py           # Trotter-Suzuki product formula (via Qiskit)
 │   ├── benchmark.py         # Benchmark: runtime/memory sweeps, verify/validate, parameter_study
-│   └── plotting.py          # consistent styling across all result plots
+│   └── post_processing.py   # consistent styling across all result plots
 ├── utils/
 │    ├── logging_config.py     # structured console + JSON-lines logging
 │    ├── meta_metadata_file_generator.py   # creates a table to map the unique run_ids to their metadata
-│    └──reproducible_runs.py   # gives benchmarking and parameter runs unique run_ids and output directories
+│    └── reproducible_runs.py   # gives benchmarking and parameter runs unique run_ids and output directories
 │     
 ├── scripts/
 │   ├── tutorial.ipynb                      # Basics tutorial: setup hamiltonian, initial state and first run
 │   ├── tutorial_evolution_methods.ipynb    # Tutorial to show other methods
 │   ├── tutorial_benchmarking.ipynb         # Tutorial for benchmarking
+│   ├── tutorial_visualizations.ipynb       # Tutorial for visualizations
 │   └── tutorial_parameter_studying.ipynb   # Tutorial for parameter study
 ├── tests/                                # pytest suite (hamiltonian, evolution, benchmark, verification)
 ├── results/                              # timestamped parameter-study output
