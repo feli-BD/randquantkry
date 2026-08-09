@@ -24,6 +24,8 @@ dependencies = [
     "pandas>=3.0.3",
     "tabulate>=0.9.0",
     "seaborn>=0.13.2",
+    "imageio-ffmpeg>=0.6.0",
+    "psutils>=7.2.2",
 ]
 
 [project.optional-dependencies]
