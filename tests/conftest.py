@@ -45,20 +45,20 @@ def localized_hamiltonian():
 
 
 @pytest.fixture
-def small_hamiltonian():
+def large_hamiltonian():
     return build_hamiltonian(4, [("XX", 0, 1.0), ("XX", 1, 1.0), ("Z", 0, 0.5)])
 
 @pytest.fixture
-def small_initial_state():
+def large_initial_state():
     return build_initial_state(4, flipped_qubit=0)
 
 @pytest.fixture
-def small_benchmark(small_hamiltonian, small_initial_state, tmp_path):
+def small_benchmark(large_hamiltonian, large_initial_state, tmp_path):
     """A Benchmark instance writing to a pytest-managed temp directory,
     so nothing pollutes your real results/ folder and every test starts clean."""
     return Benchmark(
-        hamiltonian=small_hamiltonian,
-        initial_state=small_initial_state,
+        hamiltonian=large_hamiltonian,
+        initial_state=large_initial_state,
         time=1.0,
         krylov_dim=8,
         num_random_vectors=None,

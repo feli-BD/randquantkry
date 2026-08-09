@@ -72,6 +72,8 @@ def test_time_evolve_krylov_handles_early_breakdown(localized_hamiltonian):
 # Test for randomized Krylov
 
 def test_time_evolve_randomized_krylov_matches_exact(small_hamiltonian, small_initial_state):
+    print(f"small_hamiltonian: {small_hamiltonian.to_matrix().shape}")
+
     _, exact = time_evolve_naive(small_hamiltonian, small_initial_state, time=0.5)
     out = time_evolve_randomized_krylov(
         small_hamiltonian, small_initial_state, time=0.5,
