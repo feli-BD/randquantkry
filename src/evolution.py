@@ -13,7 +13,7 @@ from scipy import sparse
 from scipy.fft import dct
 import numpy as np
 import psutil
-
+from qiskit.quantum_info import SparsePauliOp, Operator
 # imports from randquantkry
 from randquantkry.utils.logging_config import get_logger
 
@@ -21,7 +21,7 @@ log = get_logger(__name__)
 
 import psutil
 
-def time_evolve_naive(hamiltonian: SparsePauliOp, initial_state, time: float, memory_buffer_qubits: int = 2):
+def time_evolve_naive(hamiltonian: SparsePauliOp, initial_state, time: float, memory_buffer_qubits: int = 0):
     """
     Perform naive time evolution of a quantum system.
 
