@@ -8,6 +8,7 @@
 
 import numpy as np
 import pytest
+from qiskit.exceptions import QiskitError
 from randquantkry.hamiltonian import (
     build_hamiltonian,
     build_initial_state,
@@ -44,12 +45,12 @@ def test_build_hamiltonian_rejects_invalid_n_qubits(n_qubits):
 
 
 def test_build_hamiltonian_rejects_empty_terms():
-    with pytest.raises(ValueError):
+    with pytest.raises(QiskitError):
         build_hamiltonian(2, [])
 
 
 def test_build_hamiltonian_rejects_invalid_pauli_letter():
-    with pytest.raises(ValueError):
+    with pytest.raises(QiskitError):
         build_hamiltonian(2, [("XA", 0, 1.0)])
 
 
