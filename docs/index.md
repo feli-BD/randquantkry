@@ -39,63 +39,6 @@ Plus a full **benchmark suite** (runtime/memory sweeps, `verify_consistency`, `v
 `parameter_study`) and **reproducible run tracking** that logs configuration, package versions,
 and results incrementally.
 
-
-## Installation
-
-This project uses [`uv`](https://github.com/astral-sh/uv) for fast, reproducible dependency
-management.
-
-```bash
-git clone <repo-url>
-cd randquantkry
-uv sync --extra dev
-```
-
-If you prefer `pip`:
-
-```bash
-python -m venv .venv
-source .venv/bin/activate  # Linux / Mac
-pip install -e ".[dev]"
-```
-
-## Where to start ?
-
-### Interactive Walkthroughs & Tutorials
-
-For hands-on, step-by-step introductions to the package, explore the interactive Jupyter notebooks in the **[`scripts`](/scripts/)** directory:
-
-1. **[`scripts/tutorial.ipynb`](scripts/tutorial.ipynb)** - **Getting Started**: An overview covering Hamiltonian construction and naive quantum state evolution.
-<p align="center">
-  <img src="output/tutorial1.png" alt="Hamiltonian vs Unitary" width="500">
-</p>
-
-2. **[`scripts/tutorial_evolution_methods.ipynb`](scripts/tutorial_evolution_methods.ipynb)** - **Evolution Algorithms**: Dive into the available time-evolution solvers (Krylov, Randomized Krylov) and a introductory comparison of accuracy
-
-3. **[`scripts/tutorial_benchmarking.ipynb`](scripts/tutorial_benchmarking.ipynb)** - **Benchmarking Workflows**: Shows how to benchmark runtime and memory scaling across different qubit sizes and methods.
-
-<p align="center">
-  <img src="output/Memory_vs_SystemSize.png" alt="Memory vs System Size" width="45%" style="display: inline-block;">
-  <img src="output/Runtime_vs_SystemSize.png" alt="Runtime vs System Size" width="45%" style="display: inline-block;">
-</p>
-
-4. **[`scripts/tutorial_parameter_study.ipynb`](scripts/tutorial_parameter_study.ipynb)** - **Parameter Sweeps & Analysis**: How to run multi-variable parameter grids, save structured run artifacts, load JSONL logs, and plot post-processing metrics.
-
-5. **[`scripts/tutorial_visualizations.ipynb`](scripts/tutorial_visualizations.ipynb)** - **Fun Visuals for Parameter Study**: How to create bubble plots and video convergence studies.
-
-<table align="center">
-  <tr>
-    <td align="center" width="45%">
-      <img src="output/Krylov_err_vs_time.png" alt="Bubble Plot Parameter Study Krylov" width="100%">
-    </td>
-    <td align="center" width="45%">
-      <img src="output/multi_k_psi_convergence.gif" alt="Krylov Convergence Study" width="100%">
-      <br><br>
-      <img src="output/rel_error_convergence.gif" alt="Krylov Convergence Study Relative Error" width="100%">
-    </td>
-  </tr>
-</table>
-
 ## Project structure
 
 ```
@@ -127,4 +70,4 @@ randquantkry/
 
 ## License
 
-MIT — see [`LICENSE`](https://gitlab.com/<namespace>/randquantkry/-/blob/main/LICENSE).
+MIT — see [`LICENSE`](https://gitlab.git.nrw/felicia.erb/randquantkry/-/blob/main/LICENSE).
