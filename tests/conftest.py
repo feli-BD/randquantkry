@@ -1,8 +1,9 @@
 import numpy as np
 import pytest
 from qiskit.quantum_info import SparsePauliOp
-from randquantkry.hamiltonian import build_hamiltonian, build_initial_state
 from randquantkry.benchmark import Benchmark
+from randquantkry.hamiltonian import build_hamiltonian, build_initial_state
+
 
 @pytest.fixture
 def small_hamiltonian():
@@ -29,7 +30,7 @@ def small_hamiltonian():
 @pytest.fixture
 def small_initial_state(small_hamiltonian):
     n = small_hamiltonian.num_qubits
-    psi0 = np.zeros(2 ** n, dtype=complex)
+    psi0 = np.zeros(2**n, dtype=complex)
     psi0[0] = 1.0
     return psi0
 
@@ -38,7 +39,6 @@ def small_initial_state(small_hamiltonian):
 def localized_hamiltonian():
     """A Hamiltonian that only acts on qubits 0-2 of a larger register --
     used to test the early-breakdown / invariant-subspace behavior."""
-    n_qubits = 8
     labels = ["XXIIIIII", "IZZIIIII"]
     coeffs = [1.0, 0.5]
     return SparsePauliOp(labels, coeffs=coeffs)
@@ -48,9 +48,11 @@ def localized_hamiltonian():
 def large_hamiltonian():
     return build_hamiltonian(4, [("XX", 0, 1.0), ("XX", 1, 1.0), ("Z", 0, 0.5)])
 
+
 @pytest.fixture
 def large_initial_state():
     return build_initial_state(4, flipped_qubit=0)
+
 
 @pytest.fixture
 def small_benchmark(large_hamiltonian, large_initial_state, tmp_path):

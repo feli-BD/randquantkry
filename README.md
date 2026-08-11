@@ -53,6 +53,17 @@ and a **fast randomized sketch** (`randomized krylov`) using Güttel & Schweitze
 This project uses [`uv`](https://github.com/astral-sh/uv) for fast, reproducible dependency
 management.
 
+**Just want to run the code** (no tests, linting, or docs tooling):
+
+```bash
+git clone <repo-url>
+cd randquantkry
+uv sync --no-dev
+```
+
+**Contributing, testing, or grading this project** (installs pytest, ruff, black, and the docs
+toolchain in addition to the core dependencies):
+
 ```bash
 git clone <repo-url>
 cd randquantkry
@@ -66,15 +77,16 @@ uv add --dev ipykernel
 uv run python -m ipykernel install --user --name randquantkry --display-name "randquantkry (uv)"
 ```
 
-Then select **"randquantkry (uv)"** as the kernel in Jupyter/VS Code. You might need to restart VSCode to find the new kernel. Alternatively, run `uv run --extra dev jupyter lab` to launch Jupyter directly inside the project's
-environment without registering a persistent kernel.
+Then select **"randquantkry (uv)"** as the kernel in Jupyter/VS Code. You might need to restart
+VS Code to find the new kernel. Alternatively, run `uv run jupyter lab` (after `uv sync --extra dev`)
+to launch Jupyter directly inside the project's environment without registering a persistent kernel.
 
 If you prefer `pip`:
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate # Linux (or Mac)
-.venv\Scripts\activate.bat # Windows  
+source .venv/bin/activate  # Linux (or Mac)
+.venv\Scripts\activate.bat  # Windows
 pip install -e ".[dev]"
 ```
 

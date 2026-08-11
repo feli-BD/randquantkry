@@ -8,21 +8,22 @@ stages:
   - docs
 
 variables:
-  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  UV_CACHE_DIR: "$CI_PROJECT_DIR/.cache/uv"
 
 cache:
   paths:
-    - .cache/pip
+    - .cache/uv
 
 .install: &install
   - curl -LsSf https://astral.sh/uv/install.sh | sh
   - export PATH="$HOME/.local/bin:$PATH"
+  - uv --version
   - uv sync --extra dev --frozen
 
 # stage 1: check 
 sanity-check:
   stage: check
-  image: python:3.12
+  image: python:3.11
   before_script:
     - *install
   script:
@@ -33,10 +34,24 @@ sanity-check:
     - if: '$CI_COMMIT_BRANCH == "main"'
     - if: '$CI_COMMIT_BRANCH == "master"'
 
+# stage 1b: lint check
+lint-check:
+  stage: check
+  image: python:3.11
+  before_script:
+    - *install
+  script:
+    - uv run ruff check src/ utils/ tests/
+    - uv run ruff format --check src/ utils/ tests/
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_BRANCH == "master"'
+
 # Stage 2: test 
 unit-tests:
   stage: test
-  image: python:3.12
+  image: python:3.11
   before_script:
     - *install
   script:
@@ -60,7 +75,7 @@ unit-tests:
 # Stage 2b:  integration tests
 integration-tests:
   stage: test
-  image: python:3.12
+  image: python:3.11
   before_script:
     - *install
   script:

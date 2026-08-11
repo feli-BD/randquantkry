@@ -1,6 +1,6 @@
 site_name: RandQuantKry
 site_description: A RandNLA-accelerated Krylov subspace solver for quantum time evolution
-repo_url: https://gitlab.com/<namespace>/randquantkry
+repo_url: https://gitlab.git.nrw/felicia.erb/randquantkry
 repo_name: randquantkry
 edit_uri: ""
 

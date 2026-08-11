@@ -1,21 +1,22 @@
 import numpy as np
 from qiskit import QuantumCircuit
-from qiskit.quantum_info import Statevector, SparsePauliOp
 from qiskit.circuit.library import PauliEvolutionGate
+from qiskit.quantum_info import SparsePauliOp, Statevector
 from qiskit.synthesis import LieTrotter, SuzukiTrotter
-
 from randquantkry.utils.logging_config import get_logger
 
 log = get_logger(__name__)
 
 
-def time_evolve_trotter(hamiltonian: SparsePauliOp, initial_state, time: float, num_steps: int, order=1):
+def time_evolve_trotter(
+    hamiltonian: SparsePauliOp, initial_state, time: float, num_steps: int, order=1
+):
     """
     Time evolution via Trotter-Suzuki product-formula approximation, using
     Qiskit's synthesis machinery.
 
-    NOTE: this is a different approximation family from Krylov, converging to 
-    the true e^{-iHt} as num_steps -> inf. Its value as a comparison point is 
+    NOTE: this is a different approximation family from Krylov, converging to
+    the true e^{-iHt} as num_steps -> inf. Its value as a comparison point is
     that it is literally the algorithm used to run time
     evolution on real quantum hardware so it answers "how does classical
     Krylov reach compare to what a QPU would actually do", not "what is
@@ -53,12 +54,14 @@ def time_evolve_trotter(hamiltonian: SparsePauliOp, initial_state, time: float, 
     """
     log.info(
         "time_evolve_trotter: starting",
-        extra={"context": {
-            "n_qubits": hamiltonian.num_qubits,
-            "time": time,
-            "num_steps": num_steps,
-            "order": order,
-        }},
+        extra={
+            "context": {
+                "n_qubits": hamiltonian.num_qubits,
+                "time": time,
+                "num_steps": num_steps,
+                "order": order,
+            }
+        },
     )
 
     if order == 1:

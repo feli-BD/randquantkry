@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+
 import pandas as pd
 
 
@@ -22,7 +23,7 @@ def build_run_index(results_dir: str = "results") -> pd.DataFrame:
             continue
 
         try:
-            with open(metadata_file, "r") as f:
+            with open(metadata_file) as f:
                 meta = json.load(f)
 
             cfg = meta.get("run_config", {})
@@ -40,7 +41,9 @@ def build_run_index(results_dir: str = "results") -> pd.DataFrame:
             }
             records.append(record)
 
-        except Exception as e:
+        except (
+            Exception  # noqa: BLE001 —> skip unparseable metadata files, don't abort the scan
+        ) as e:
             print(f"Warning: Could not parse {metadata_file}: {e}")
 
     df = pd.DataFrame(records)
@@ -67,9 +70,7 @@ def build_run_index(results_dir: str = "results") -> pd.DataFrame:
                 ].to_markdown(index=False)
             )
 
-        print(
-            f"Successfully cataloged {len(df)} runs -> {csv_out} and {md_out}"
-        )
+        print(f"Successfully cataloged {len(df)} runs -> {csv_out} and {md_out}")
     else:
         print("No run directories with valid metadata.json found.")
 

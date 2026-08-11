@@ -1,7 +1,6 @@
 import numpy as np
-import pytest
-from randquantkry.hamiltonian import build_hamiltonian, build_initial_state
 from randquantkry.evolution import time_evolve_naive
+from randquantkry.hamiltonian import build_hamiltonian, build_initial_state
 from randquantkry.trotter import time_evolve_trotter
 
 H = build_hamiltonian(3, [("XX", 0, 1.0), ("Z", 1, 0.5)])

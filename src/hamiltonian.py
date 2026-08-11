@@ -5,14 +5,16 @@
 ###########################################################################
 
 # imports
-from qiskit.quantum_info import SparsePauliOp, Operator
 import numpy as np
-from scipy.linalg import expm
+from qiskit.quantum_info import SparsePauliOp
 from randquantkry.utils.logging_config import get_logger
 
 log = get_logger(__name__)
 
-def build_hamiltonian(n_qubits: int,  terms: list[tuple[str, int, float]]) -> SparsePauliOp:
+
+def build_hamiltonian(
+    n_qubits: int, terms: list[tuple[str, int, float]]
+) -> SparsePauliOp:
     """
     Build the Hamiltonian function from the given number of qubits and gates. Currently implemented for 1D Hamiltonians.
 
@@ -20,15 +22,16 @@ def build_hamiltonian(n_qubits: int,  terms: list[tuple[str, int, float]]) -> Sp
     ----------
     n_qubits (int): The number of qubits for the Hamiltonian.
 
-    terms (list): List of (gate, start_qubit, coeff) tuples. 
+    terms (list): List of (gate, start_qubit, coeff) tuples.
                 'gate' (str) defines the Pauli string (e.g., "XX").
                 'start_qubit' (int) is the index where the interaction begins.
                 'coeff' (float) is the term's scalar weight.
     Returns
     -------
     SparsePauliOp
-        A SparsePauliOp object that represents the Hamiltonian function, which can be called with the state variables to compute the Hamiltonian matrix.
-        
+        A SparsePauliOp object that represents the Hamiltonian function, which can be called with the state variables to
+        compute the Hamiltonian matrix.
+
     """
 
     labels = []
@@ -37,27 +40,32 @@ def build_hamiltonian(n_qubits: int,  terms: list[tuple[str, int, float]]) -> Sp
     for gate, qubit, coeff in terms:
         span = len(gate)
         if qubit < 0 or qubit + span - 1 >= n_qubits:
-            raise ValueError(f"term {gate!r} at qubit {qubit} out of range for n_qubits={n_qubits}")
-        
-        s = ['I'] * n_qubits
-        
+            raise ValueError(
+                f"term {gate!r} at qubit {qubit} out of range for n_qubits={n_qubits}"
+            )
+
+        s = ["I"] * n_qubits
+
         s[(qubit)] = gate[0]
-        if len(gate)==2:
-            s[(qubit+1)] = gate[1]
-        
-        labels.append(''.join(s))
+        if len(gate) == 2:
+            s[(qubit + 1)] = gate[1]
+
+        labels.append("".join(s))
         coefficients.append(coeff)
 
     hamiltonian = SparsePauliOp(labels, coeffs=np.array(coefficients, dtype=complex))
     log.info(
         "build_hamiltonian: built",
-        extra={"context": {
-            "n_qubits": n_qubits,
-            "matrix_dim": 2 ** n_qubits,
-            "n_terms": len(terms),
-        }},
+        extra={
+            "context": {
+                "n_qubits": n_qubits,
+                "matrix_dim": 2**n_qubits,
+                "n_terms": len(terms),
+            }
+        },
     )
     return hamiltonian
+
 
 def build_initial_state(n_qubits=int, flipped_qubit=int):
     """
@@ -65,9 +73,13 @@ def build_initial_state(n_qubits=int, flipped_qubit=int):
     Warning: Currently only supports flipping one state.
     """
     initial_state = np.zeros(2**n_qubits, dtype=complex)
-    initial_state[flipped_qubit] = 1.0   # |0000...0>)
+    initial_state[flipped_qubit] = 1.0  # |0000...0>)
     return initial_state
-def reconstruct_hamiltonian(n_qubits: int, hamiltonian: SparsePauliOp, uniform: bool = True):
+
+
+def reconstruct_hamiltonian(
+    n_qubits: int, hamiltonian: SparsePauliOp, uniform: bool = True
+):
     """
     Parameters
     ----------
@@ -87,9 +99,9 @@ def reconstruct_hamiltonian(n_qubits: int, hamiltonian: SparsePauliOp, uniform: 
     SparsePauliOp
     """
     terms = []
-    for pauli, coeff in zip(hamiltonian.paulis, hamiltonian.coeffs):
+    for pauli, coeff in zip(hamiltonian.paulis, hamiltonian.coeffs, strict=True):
         label = str(pauli)
-        nonzero_positions = [i for i, ch in enumerate(label) if ch != 'I']
+        nonzero_positions = [i for i, ch in enumerate(label) if ch != "I"]
 
         if not nonzero_positions:
             continue
@@ -109,7 +121,7 @@ def reconstruct_hamiltonian(n_qubits: int, hamiltonian: SparsePauliOp, uniform: 
                 f"extract_terms only supports 1- or 2-qubit terms."
             )
 
-        gate = ''.join(label[i] for i in nonzero_positions)
+        gate = "".join(label[i] for i in nonzero_positions)
         terms.append((gate, start_qubit, complex(coeff)))
 
     if not uniform:
@@ -144,7 +156,13 @@ def reconstruct_hamiltonian(n_qubits: int, hamiltonian: SparsePauliOp, uniform: 
 
     log.info(
         "reconstruct_hamiltonian: reconstructed (uniform)",
-        extra={"context": {"n_qubits": n_qubits, "n_original_terms": len(terms), "gate_types": list(avg_coeff_by_gate_type)}},
+        extra={
+            "context": {
+                "n_qubits": n_qubits,
+                "n_original_terms": len(terms),
+                "gate_types": list(avg_coeff_by_gate_type),
+            }
+        },
     )
 
     return build_hamiltonian(n_qubits, new_terms)

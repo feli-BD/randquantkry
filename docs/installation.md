@@ -3,13 +3,24 @@
 This project uses [`uv`](https://github.com/astral-sh/uv) for fast, reproducible dependency
 management.
 
+**Just want to run the code** (no tests, linting, or docs tooling):
+
+```bash
+git clone <repo-url>
+cd randquantkry
+uv sync --no-dev
+```
+
+**Contributing, testing, or grading this project** (installs pytest, ruff, black, and the docs
+toolchain in addition to the core dependencies):
+
 ```bash
 git clone <repo-url>
 cd randquantkry
 uv sync --extra dev
 ```
 
-## Using notebooks with the project's environment (recommended)
+To use notebooks with this project's environment (RECOMMENDED):
 
 ```bash
 uv add --dev ipykernel
@@ -17,14 +28,14 @@ uv run python -m ipykernel install --user --name randquantkry --display-name "ra
 ```
 
 Then select **"randquantkry (uv)"** as the kernel in Jupyter/VS Code. You might need to restart
-VS Code to find the new kernel. Alternatively, run `uv run --extra dev jupyter lab` to launch
-Jupyter directly inside the project's environment without registering a persistent kernel.
+VS Code to find the new kernel. Alternatively, run `uv run jupyter lab` (after `uv sync --extra dev`)
+to launch Jupyter directly inside the project's environment without registering a persistent kernel.
 
-## Alternative: pip
+If you prefer `pip`:
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate  # Linux / Mac
+source .venv/bin/activate  # Linux (or Mac)
 .venv\Scripts\activate.bat  # Windows
 pip install -e ".[dev]"
 ```

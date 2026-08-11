@@ -48,7 +48,7 @@ randquantkry/
 │   ├── evolution.py         # naive, krylov, randomized_krylov(_gaussian)
 │   ├── trotter.py           # Trotter-Suzuki product formula (via Qiskit)
 │   ├── benchmark.py         # Benchmark: runtime/memory sweeps, verify/validate, parameter_study
-│   └── plotting.py          # consistent styling across all result plots
+│   └── post_processing.py   # consistent styling across all result plots
 ├── utils/
 │   ├── logging_config.py              # structured console + JSON-lines logging
 │   ├── meta_metadata_file_generator.py # maps run_ids to metadata

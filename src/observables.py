@@ -8,32 +8,12 @@
 # imports
 import matplotlib.pyplot as plt
 import numpy as np
-from IPython.display import Latex, display
 import seaborn as sns
+from IPython.display import Latex, display
 from scipy.sparse import csr_matrix, issparse
 
 
-# def observable_function(state_variables):
-#     """
-#     Translate the raw quantum state evolution to physical measurements.
-
-#     Parameters
-#     ----------
-#     state_variables : array-like
-#         The state variables representing the quantum state.
-
-#     Returns
-#     -------
-#     dict
-#         A dictionary containing the computed observables based on the state variables.
-        
-#     """
-
-
-
-def print_quantum_state(
-    state, label="|ψ⟩", threshold=1e-5, reverse_bits=False
-):
+def print_quantum_state(state, label="|ψ⟩", threshold=1e-5, reverse_bits=False):
     """Print complex state vector in clean ASCII Dirac notation."""
     n_qubits = int(np.round(np.log2(len(state))))
     terms = []
@@ -62,12 +42,9 @@ def print_quantum_state(
     print(f"{label} = " + " + ".join(terms).replace("+ -", "- "))
 
 
-
-
-
 def plot_unitary_matrix(unitary):
     """Plot the magnitude heatmap of a Unitary matrix."""
-    fig, ax = plt.subplots(figsize=(6, 5))
+    _, ax = plt.subplots(figsize=(6, 5))
     im = ax.imshow(np.abs(unitary), cmap="viridis")
 
     plt.colorbar(im, label="|U_ij|")
@@ -76,7 +53,6 @@ def plot_unitary_matrix(unitary):
     ax.set_ylabel("Output State Index")
     plt.tight_layout()
     plt.show()
-
 
 
 def display_quantum_state_latex(
@@ -88,20 +64,18 @@ def display_quantum_state_latex(
 
     for i, amp in enumerate(state):
         if np.abs(amp) > threshold:
-            # Bitstring erzeugen (z.B. index 0 -> "00000000")
+            # 0 -> "00000000"
             bitstring = format(i, f"0{n_qubits}b")
 
-            # Falls Qiskit-Konvention (Little-Endian) gewünscht ist
             if reverse_bits:
                 bitstring = bitstring[::-1]
 
             real, imag = amp.real, amp.imag
 
-            # Vorfaktor / Amplitude sauber formatieren
             if np.isclose(amp, 1.0):
-                amp_str = ""  # Bei +1.0 schreiben wir einfach nur |00000000⟩
+                amp_str = ""  # |00000000⟩
             elif np.isclose(amp, -1.0):
-                amp_str = "-"  # Bei -1.0 schreiben wir -|00000000⟩
+                amp_str = "-"  #  -|00000000⟩
             elif abs(imag) < threshold:
                 amp_str = f"{real:+.4f} "
             elif abs(real) < threshold:
@@ -109,7 +83,6 @@ def display_quantum_state_latex(
             else:
                 amp_str = f"({real:+.4f}{imag:+.4f}j) "
 
-            # WICHTIG: Das Leerzeichen verhindert das Verschmelzen von Zahlen und Bits
             terms.append(f"{amp_str}|{bitstring}\\rangle")
 
     latex_str = " + ".join(terms).replace("+ -", "- ")
@@ -129,7 +102,7 @@ def plot_state_histogram(state, threshold=1e-3, title="State Probabilities"):
     bitstrings = [format(i, f"0{n_qubits}b") for i in indices]
 
     # Plot
-    fig, ax = plt.subplots(figsize=(14, 6))
+    _, ax = plt.subplots(figsize=(14, 6))
     bars = ax.bar(bitstrings, filtered_probs, color="#6200ee", alpha=0.85)
 
     ax.set_ylabel("Probability $P(x) = |c_x|^2$", fontsize=11)
@@ -157,6 +130,7 @@ def plot_state_histogram(state, threshold=1e-3, title="State Probabilities"):
 
 # Operator representation
 
+
 def plot_hamiltonian_heatmap(H, title="Hamiltonian Matrix Elements |H_ij|"):
     """Plot a heatmap of the absolute magnitude of matrix elements."""
     H_dense = H.toarray() if hasattr(H, "toarray") else H
@@ -176,7 +150,7 @@ def plot_hamiltonian_heatmap(H, title="Hamiltonian Matrix Elements |H_ij|"):
     ax.set_ylabel("State $|i\\rangle$", fontsize=10)
 
     plt.tight_layout()
-    plt.show()   
+    plt.show()
 
 
 def plot_operator_sparsity(
@@ -230,9 +204,7 @@ def plot_operator_sparsity(
 
     # 3. Apply threshold to construct non-zero boolean mask
     mask = np.abs(matrix.data) > threshold
-    sparse_mask = csr_matrix(
-        (mask, matrix.indices, matrix.indptr), shape=matrix.shape
-    )
+    sparse_mask = csr_matrix((mask, matrix.indices, matrix.indptr), shape=matrix.shape)
 
     # 4. Set visual style based on operator type
     if is_unitary:
@@ -251,7 +223,7 @@ def plot_operator_sparsity(
 
     # 5. Plot using ax.spy
     if ax is None:
-        fig, ax = plt.subplots(figsize=(6, 6))
+        _, ax = plt.subplots(figsize=(6, 6))
 
     ax.spy(sparse_mask, markersize=markersize, color=plot_color)
 
@@ -266,6 +238,7 @@ def plot_operator_sparsity(
     plt.tight_layout()
 
     return ax
+
 
 def plot_operator_subblock(
     operator, block_size=8, is_unitary=None, title=None, ax=None
@@ -321,15 +294,13 @@ def plot_operator_subblock(
         cbar_label = r"$|H_{ij}|$"
         vmin, vmax = None, None
         annot_data = sub_block.real  # Real values for Hamiltonian
-        default_title = (
-            f"Hamiltonian Sub-block H ({block_size}x{block_size})"
-        )
+        default_title = f"Hamiltonian Sub-block H ({block_size}x{block_size})"
         xlabel = r"State $|j\rangle$"
         ylabel = r"State $|i\rangle$"
 
     # 5. Plot heatmap
     if ax is None:
-        fig, ax = plt.subplots(figsize=(8, 7))
+        _, ax = plt.subplots(figsize=(8, 7))
 
     sns.heatmap(
         np.abs(sub_block),

@@ -12,21 +12,23 @@ Each run gets its own timestamped directory containing:
                     computed so far is still safely on disk and loadable.
 """
 
+import hashlib
 import json
 import os
-import subprocess
-from datetime import datetime, timezone
-from pathlib import Path
-import platform, psutil
-import pandas as pd
-import sys
 import platform
-import hashlib
+import subprocess
+import sys
+from datetime import UTC, datetime
+from pathlib import Path
+
 import numpy as np
+import pandas as pd
+import psutil
 
 
 def _get_package_versions(packages=("numpy", "scipy", "qiskit", "pandas")):
     import importlib.metadata
+
     versions = {}
     for pkg in packages:
         try:
@@ -38,11 +40,18 @@ def _get_package_versions(packages=("numpy", "scipy", "qiskit", "pandas")):
 
 def _get_git_commit():
     try:
-        return subprocess.check_output(
-            ["git", "rev-parse", "HEAD"], stderr=subprocess.DEVNULL
-        ).decode().strip()
-    except Exception:
+        return (
+            subprocess.check_output(
+                ["git", "rev-parse", "HEAD"], stderr=subprocess.DEVNULL # noqa: S607 —> trusted local git call, not exposed to untrusted input
+            )
+            .decode()
+            .strip()
+        )
+    except (
+        Exception # noqa: BLE001 —> best-effort metadata, failure just means it's unavailable
+    ):
         return None
+
 
 def _get_hardware():
     try:
@@ -50,26 +59,28 @@ def _get_hardware():
             "platform": platform.platform(),
             "processor": platform.processor(),
             "cpu_count": psutil.cpu_count(logical=True),
-            "total_memory_gb": round(psutil.virtual_memory().total / 1e9, 2)}
-    except Exception:
+            "total_memory_gb": round(psutil.virtual_memory().total / 1e9, 2),
+        }
+    except (
+        Exception # noqa: BLE001 —> best-effort metadata, failure just means it's unavailable
+    ):
         return None
 
 
 def _get_environment_metadata():
-    repo_root = Path(__file__).resolve().parents[1]  
+    repo_root = Path(__file__).resolve().parents[1]
     lock_path = repo_root / "uv.lock"
     metadata = {
         # Exact Python interpreter, not just package versions
         "python_version": sys.version,
         "python_implementation": platform.python_implementation(),  # CPython vs PyPy
-
         # Lock file hash
         "uv_lock_sha256": _hash_file(lock_path),
-
         # The actual math backend NumPy/SciPy are using — this is the missing piece
         "numpy_blas_info": _get_blas_backend_info(),
     }
     return metadata
+
 
 def _hash_file(path: str) -> str:
     h = hashlib.sha256()
@@ -77,13 +88,19 @@ def _hash_file(path: str) -> str:
         h.update(f.read())
     return h.hexdigest()
 
+
 def _get_blas_backend_info():
     """Extract which BLAS/LAPACK library NumPy is actually linked against."""
     config = np.show_config(mode="dicts")
     return {
-        "blas": config.get("Build Dependencies", {}).get("blas", {}).get("name", "unknown"),
-        "lapack": config.get("Build Dependencies", {}).get("lapack", {}).get("name", "unknown"),
+        "blas": config.get("Build Dependencies", {})
+        .get("blas", {})
+        .get("name", "unknown"),
+        "lapack": config.get("Build Dependencies", {})
+        .get("lapack", {})
+        .get("name", "unknown"),
     }
+
 
 def _method_shorthand(methods):
     """Build a short, readable tag from a list of method names."""
@@ -94,7 +111,9 @@ def _method_shorthand(methods):
         "randomized_krylov_gaussian": "rkryg",
         "trotter": "trot",
     }
-    tags = [shorthand_map.get(m, m[:4]) for m in methods]  # fallback: first 4 chars of unknown methods
+    tags = [
+        shorthand_map.get(m, m[:4]) for m in methods
+    ]  # fallback: first 4 chars of unknown methods
     return "-".join(tags)
 
 
@@ -129,7 +148,7 @@ def start_run(output_dir, run_config):
         The created run directory, e.g.
         results/run_kry-rkry_q4-10_20260721T143205Z/
     """
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
 
     methods = run_config.get("methods", [])
     n_qubits_list = run_config.get("n_qubits_list", [])
@@ -143,7 +162,7 @@ def start_run(output_dir, run_config):
 
     metadata = {
         "run_id": run_id,
-        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+        "timestamp_utc": datetime.now(UTC).isoformat(),
         "run_config": run_config,
         "environment": _get_environment_metadata(),
         "package_versions": _get_package_versions(),
@@ -154,6 +173,7 @@ def start_run(output_dir, run_config):
         json.dump(metadata, f, indent=2, default=str)
 
     return run_dir
+
 
 def append_result_row(run_dir, row):
     """
@@ -199,7 +219,8 @@ def load_run(run_dir):
 
 def hash_terms(terms: list[tuple[str, int, float]]) -> str:
     """Checksums for verifying experiment inputs haven't
-     silently changed between runs."""
+    silently changed between runs."""
+
     def _serialize_coeff(c):
         if isinstance(c, complex):
             return [c.real, c.imag]
