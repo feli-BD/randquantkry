@@ -5,7 +5,7 @@
 stages:
   - check
   - test
-  - deploy
+  - docs
 
 variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
@@ -82,13 +82,13 @@ integration-tests:
     - if: '$CI_COMMIT_BRANCH == "master"'
 
 
-# Stage 4: build documentation 
+# Stage 3: build documentation 
 pages:
-  stage: deploy
+  stage: docs
   image: ghcr.io/astral-sh/uv:python3.11-bookworm-slim
   script:
     - uv sync --frozen
-    - uv run mkdocs build --site-dir public
+    - uv run mkdocs build -f docs/mkdocs.yml
   artifacts:
     paths:
       - public

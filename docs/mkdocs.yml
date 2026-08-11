@@ -4,6 +4,12 @@ repo_url: https://gitlab.com/<namespace>/randquantkry
 repo_name: randquantkry
 edit_uri: ""
 
+site_url: https://<namespace>.gitlab.io/randquantkry/
+use_directory_urls: false
+
+docs_dir: .
+site_dir: ../public
+
 theme:
   name: material
   palette:
