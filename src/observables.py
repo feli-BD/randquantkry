@@ -55,9 +55,7 @@ def plot_unitary_matrix(unitary):
     plt.show()
 
 
-def display_quantum_state_latex(
-    state, label=r"|\psi\rangle", threshold=1e-5, reverse_bits=False
-):
+def display_quantum_state_latex(state, label=r"|\psi\rangle", threshold=1e-5, reverse_bits=False):
     """Render a NumPy state vector as a LaTeX Dirac formula in Jupyter."""
     n_qubits = int(np.round(np.log2(len(state))))
     terms = []
@@ -240,9 +238,7 @@ def plot_operator_sparsity(
     return ax
 
 
-def plot_operator_subblock(
-    operator, block_size=8, is_unitary=None, title=None, ax=None
-):
+def plot_operator_subblock(operator, block_size=8, is_unitary=None, title=None, ax=None):
     """Plot an annotated sub-block of an operator (Hamiltonian or Unitary).
 
     Parameters:

@@ -37,17 +37,13 @@ def test_naive_preserves_norm():
 
 def test_time_evolve_krylov_matches_exact(small_hamiltonian, small_initial_state):
     _, exact = time_evolve_naive(small_hamiltonian, small_initial_state, time=0.5)
-    out = time_evolve_krylov(
-        small_hamiltonian, small_initial_state, time=0.5, krylov_dim=20
-    )
+    out = time_evolve_krylov(small_hamiltonian, small_initial_state, time=0.5, krylov_dim=20)
     # 20 Krylov vectors should fully converge for a 6-qubit (64-dim) system
     assert np.linalg.norm(out - exact) < 1e-8
 
 
 def test_time_evolve_krylov_preserves_norm(small_hamiltonian, small_initial_state):
-    out = time_evolve_krylov(
-        small_hamiltonian, small_initial_state, time=0.5, krylov_dim=15
-    )
+    out = time_evolve_krylov(small_hamiltonian, small_initial_state, time=0.5, krylov_dim=15)
     assert np.isclose(np.linalg.norm(out), 1.0, atol=1e-8)
 
 
@@ -82,9 +78,7 @@ def test_time_evolve_krylov_handles_early_breakdown(localized_hamiltonian):
 # Test for randomized Krylov
 
 
-def test_time_evolve_randomized_krylov_matches_exact(
-    small_hamiltonian, small_initial_state
-):
+def test_time_evolve_randomized_krylov_matches_exact(small_hamiltonian, small_initial_state):
     print(f"small_hamiltonian: {small_hamiltonian.to_matrix().shape}")
 
     _, exact = time_evolve_naive(small_hamiltonian, small_initial_state, time=0.5)
@@ -101,9 +95,7 @@ def test_time_evolve_randomized_krylov_matches_exact(
     assert np.linalg.norm(out - exact) < 1e-4
 
 
-def test_time_evolve_randomized_krylov_preserves_norm(
-    small_hamiltonian, small_initial_state
-):
+def test_time_evolve_randomized_krylov_preserves_norm(small_hamiltonian, small_initial_state):
     """This is the single most important regression test in this suite:
     it directly catches the normalization-drift instability found during
     development, where naive sketch-based normalization caused the state
@@ -121,9 +113,7 @@ def test_time_evolve_randomized_krylov_preserves_norm(
 
 
 @pytest.mark.parametrize("sketch_dim", [16, 20, 31, 50])
-def test_time_evolve_randomized_krylov_stable_across_sketch_sizes(
-    small_hamiltonian, small_initial_state, sketch_dim
-):
+def test_time_evolve_randomized_krylov_stable_across_sketch_sizes(small_hamiltonian, small_initial_state, sketch_dim):
     """Regression test for the chaotic-error bug: error should be small and
     roughly stable across sketch dimensions, not wildly varying."""
     _, exact = time_evolve_naive(small_hamiltonian, small_initial_state, time=0.5)
@@ -140,9 +130,7 @@ def test_time_evolve_randomized_krylov_stable_across_sketch_sizes(
     assert rel_error < 1e-3
 
 
-def test_randomized_krylov_deterministic_given_seed(
-    small_hamiltonian, small_initial_state
-):
+def test_randomized_krylov_deterministic_given_seed(small_hamiltonian, small_initial_state):
     out1 = time_evolve_randomized_krylov(
         small_hamiltonian,
         small_initial_state,
@@ -162,9 +150,7 @@ def test_randomized_krylov_deterministic_given_seed(
     assert np.allclose(out1, out2)
 
 
-def test_randomized_krylov_different_seeds_give_different_results(
-    small_hamiltonian, small_initial_state
-):
+def test_randomized_krylov_different_seeds_give_different_results(small_hamiltonian, small_initial_state):
     out1 = time_evolve_randomized_krylov(
         small_hamiltonian,
         small_initial_state,

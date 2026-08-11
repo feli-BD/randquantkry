@@ -42,13 +42,14 @@ def _get_git_commit():
     try:
         return (
             subprocess.check_output(
-                ["git", "rev-parse", "HEAD"], stderr=subprocess.DEVNULL # noqa: S607 —> trusted local git call, not exposed to untrusted input
+                ["git", "rev-parse", "HEAD"],  # noqa: S607 —> trusted local git call, not exposed to untrusted input
+                stderr=subprocess.DEVNULL,
             )
             .decode()
             .strip()
         )
     except (
-        Exception # noqa: BLE001 —> best-effort metadata, failure just means it's unavailable
+        Exception  # noqa: BLE001 —> best-effort metadata, failure just means it's unavailable
     ):
         return None
 
@@ -62,7 +63,7 @@ def _get_hardware():
             "total_memory_gb": round(psutil.virtual_memory().total / 1e9, 2),
         }
     except (
-        Exception # noqa: BLE001 —> best-effort metadata, failure just means it's unavailable
+        Exception  # noqa: BLE001 —> best-effort metadata, failure just means it's unavailable
     ):
         return None
 
@@ -93,12 +94,8 @@ def _get_blas_backend_info():
     """Extract which BLAS/LAPACK library NumPy is actually linked against."""
     config = np.show_config(mode="dicts")
     return {
-        "blas": config.get("Build Dependencies", {})
-        .get("blas", {})
-        .get("name", "unknown"),
-        "lapack": config.get("Build Dependencies", {})
-        .get("lapack", {})
-        .get("name", "unknown"),
+        "blas": config.get("Build Dependencies", {}).get("blas", {}).get("name", "unknown"),
+        "lapack": config.get("Build Dependencies", {}).get("lapack", {}).get("name", "unknown"),
     }
 
 
@@ -111,9 +108,7 @@ def _method_shorthand(methods):
         "randomized_krylov_gaussian": "rkryg",
         "trotter": "trot",
     }
-    tags = [
-        shorthand_map.get(m, m[:4]) for m in methods
-    ]  # fallback: first 4 chars of unknown methods
+    tags = [shorthand_map.get(m, m[:4]) for m in methods]  # fallback: first 4 chars of unknown methods
     return "-".join(tags)
 
 

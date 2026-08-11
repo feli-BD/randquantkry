@@ -161,7 +161,6 @@ def time_evolve_krylov(
     betas = []
 
     for m in range(krylov_dim):
-
         # cheap matrix vector product
         mat_vec_prod = H @ V[m]
 
@@ -202,11 +201,7 @@ def time_evolve_krylov(
     betas_for_tridiagonal = (
         betas[: k - 1] if k > 1 else []
     )  # fix: in case early break alphas different shape than betas
-    Tri = (
-        np.diag(alphas)
-        + np.diag(betas_for_tridiagonal, k=1)
-        + np.diag(betas_for_tridiagonal, k=-1)
-    )
+    Tri = np.diag(alphas) + np.diag(betas_for_tridiagonal, k=1) + np.diag(betas_for_tridiagonal, k=-1)
 
     log.debug(
         "time_evolve_krylov: basis built",
@@ -223,9 +218,7 @@ def time_evolve_krylov(
     e1 = np.zeros(k, dtype=complex)
     e1[0] = 1.0  # initial state in Krylov subspace
     evolved_state_krylov = expm(-1j * Tri * time) @ e1
-    evolved_state = (
-        np.linalg.norm(initial_state) * np.array(V[:k]).T @ evolved_state_krylov
-    )
+    evolved_state = np.linalg.norm(initial_state) * np.array(V[:k]).T @ evolved_state_krylov
 
     log.info(
         "time_evolve_krylov: complete",
@@ -268,10 +261,10 @@ def time_evolve_randomized_krylov(
     krylov_dim : int
         The dimension of the Krylov subspace.
     num_random_vectors : int
-        The number of random vectors to use in the randomized Krylov method that span the randomly sampled subspace. 
+        The number of random vectors to use in the randomized Krylov method that span the randomly sampled subspace.
         Recommended: 2*krylov_dim +1
     trunc : int, optional
-        The truncation parameter for the randomized Krylov method aka against how many basis vectors krylov should 
+        The truncation parameter for the randomized Krylov method aka against how many basis vectors krylov should
         still reorthogonalize.
     seed : int, optional
         Seed for numpy's global RNG before the randomized method runs, so
@@ -314,13 +307,7 @@ def time_evolve_randomized_krylov(
             EM = e[:, None] * M
         else:
             EM = e * M
-        return (
-            scale
-            * (
-                dct(EM.real, norm="ortho", axis=0)
-                + 1j * dct(EM.imag, norm="ortho", axis=0)
-            )[d_idx]
-        )
+        return scale * (dct(EM.real, norm="ortho", axis=0) + 1j * dct(EM.imag, norm="ortho", axis=0))[d_idx]
 
     log.debug(
         "time_evolve_randomized_krylov: sketch operator built",
@@ -335,7 +322,6 @@ def time_evolve_randomized_krylov(
     betas = []
 
     for m in range(krylov_dim):
-
         # cheap matrix vector product
         mat_vec_prod = H @ V[m]
 
@@ -395,9 +381,7 @@ def time_evolve_randomized_krylov(
         "time_evolve_randomized_krylov: H_tilde built",
         extra={
             "context": {
-                "H_tilde_hermitian_deviation": float(
-                    np.max(np.abs(H_tilde - H_tilde.conj().T))
-                ),
+                "H_tilde_hermitian_deviation": float(np.max(np.abs(H_tilde - H_tilde.conj().T))),
             }
         },
     )
@@ -471,9 +455,7 @@ def time_evolve_randomized_krylov_gaussian(
     V = [v]  # list to store Krylov vectors
 
     # Random matrix using
-    S = np.random.randn(num_random_vectors, H.shape[0]) + 1j * np.random.randn(
-        num_random_vectors, H.shape[0]
-    )
+    S = np.random.randn(num_random_vectors, H.shape[0]) + 1j * np.random.randn(num_random_vectors, H.shape[0])
     log.debug(
         "time_evolve_randomized_krylov: sketch matrix drawn",
         extra={"context": {"S_shape": S.shape}},
@@ -486,7 +468,6 @@ def time_evolve_randomized_krylov_gaussian(
     betas = []
 
     for m in range(krylov_dim):
-
         # cheap matrix vector product
         mat_vec_prod = H @ V[m]
 
@@ -532,11 +513,7 @@ def time_evolve_randomized_krylov_gaussian(
     betas_for_tridiagonal = (
         betas[: k - 1] if k > 1 else []
     )  # fix: in case early break alphas different shape than betas
-    Tri = (
-        np.diag(alphas)
-        + np.diag(betas_for_tridiagonal, k=1)
-        + np.diag(betas_for_tridiagonal, k=-1)
-    )
+    Tri = np.diag(alphas) + np.diag(betas_for_tridiagonal, k=1) + np.diag(betas_for_tridiagonal, k=-1)
 
     log.info(
         "time_evolve_randomized_krylov: basis built",
@@ -555,9 +532,7 @@ def time_evolve_randomized_krylov_gaussian(
     e1 = np.zeros(k, dtype=complex)
     e1[0] = 1.0  # initial state in Krylov subspace
     evolved_state_krylov = expm(-1j * Tri * time) @ e1
-    evolved_state = (
-        np.linalg.norm(initial_state) * np.array(V[:k]).T @ evolved_state_krylov
-    )
+    evolved_state = np.linalg.norm(initial_state) * np.array(V[:k]).T @ evolved_state_krylov
 
     log.info(
         "time_evolve_randomized_krylov: complete",
@@ -580,7 +555,7 @@ def time_evolve_randomized_krylov_gramschmidt(
     seed=67,
 ):
     """
-    Perform time evolution using the randomized Krylov subspace method using a randomized gram schmidt approach 
+    Perform time evolution using the randomized Krylov subspace method using a randomized gram schmidt approach
     by Balabanov, O., & Grigori, L. (2022). *Randomized Gram-Schmidt process with application to GMRES.*
 
     Parameters
@@ -638,7 +613,6 @@ def time_evolve_randomized_krylov_gramschmidt(
     betas = []
 
     for m in range(krylov_dim):
-
         # cheap matrix vector product
         mat_vec_prod = H @ V[m]
 
@@ -687,11 +661,7 @@ def time_evolve_randomized_krylov_gramschmidt(
     betas_for_tridiagonal = (
         betas[: k - 1] if k > 1 else []
     )  # fix: in case early break alphas different shape than betas
-    Tri = (
-        np.diag(alphas)
-        + np.diag(betas_for_tridiagonal, k=1)
-        + np.diag(betas_for_tridiagonal, k=-1)
-    )
+    Tri = np.diag(alphas) + np.diag(betas_for_tridiagonal, k=1) + np.diag(betas_for_tridiagonal, k=-1)
 
     log.info(
         "time_evolve_randomized_krylov: basis built",
@@ -710,9 +680,7 @@ def time_evolve_randomized_krylov_gramschmidt(
     e1 = np.zeros(k, dtype=complex)
     e1[0] = 1.0  # initial state in Krylov subspace
     evolved_state_krylov = expm(-1j * Tri * time) @ e1
-    evolved_state = (
-        np.linalg.norm(initial_state) * np.array(V[:k]).T @ evolved_state_krylov
-    )
+    evolved_state = np.linalg.norm(initial_state) * np.array(V[:k]).T @ evolved_state_krylov
 
     log.info(
         "time_evolve_randomized_krylov: complete",

@@ -12,9 +12,7 @@ from randquantkry.utils.logging_config import get_logger
 log = get_logger(__name__)
 
 
-def build_hamiltonian(
-    n_qubits: int, terms: list[tuple[str, int, float]]
-) -> SparsePauliOp:
+def build_hamiltonian(n_qubits: int, terms: list[tuple[str, int, float]]) -> SparsePauliOp:
     """
     Build the Hamiltonian function from the given number of qubits and gates. Currently implemented for 1D Hamiltonians.
 
@@ -40,9 +38,7 @@ def build_hamiltonian(
     for gate, qubit, coeff in terms:
         span = len(gate)
         if qubit < 0 or qubit + span - 1 >= n_qubits:
-            raise ValueError(
-                f"term {gate!r} at qubit {qubit} out of range for n_qubits={n_qubits}"
-            )
+            raise ValueError(f"term {gate!r} at qubit {qubit} out of range for n_qubits={n_qubits}")
 
         s = ["I"] * n_qubits
 
@@ -77,9 +73,7 @@ def build_initial_state(n_qubits=int, flipped_qubit=int):
     return initial_state
 
 
-def reconstruct_hamiltonian(
-    n_qubits: int, hamiltonian: SparsePauliOp, uniform: bool = True
-):
+def reconstruct_hamiltonian(n_qubits: int, hamiltonian: SparsePauliOp, uniform: bool = True):
     """
     Parameters
     ----------
@@ -137,9 +131,7 @@ def reconstruct_hamiltonian(
     for gate, _start_qubit, coeff in terms:
         coeffs_by_gate_type.setdefault(gate, []).append(coeff)
 
-    avg_coeff_by_gate_type = {
-        gate: np.mean(coeff_list) for gate, coeff_list in coeffs_by_gate_type.items()
-    }
+    avg_coeff_by_gate_type = {gate: np.mean(coeff_list) for gate, coeff_list in coeffs_by_gate_type.items()}
 
     new_terms = []
     for gate, avg_coeff in avg_coeff_by_gate_type.items():

@@ -16,12 +16,8 @@ def test_trotter_converges_to_exact_with_more_steps():
     """The core claim of Trotter: error should shrink as num_steps increases."""
     _, exact = time_evolve_naive(H, psi0, time=1.0)
 
-    err_few_steps = np.linalg.norm(
-        time_evolve_trotter(H, psi0, time=1.0, num_steps=2, order=1) - exact
-    )
-    err_many_steps = np.linalg.norm(
-        time_evolve_trotter(H, psi0, time=1.0, num_steps=50, order=1) - exact
-    )
+    err_few_steps = np.linalg.norm(time_evolve_trotter(H, psi0, time=1.0, num_steps=2, order=1) - exact)
+    err_many_steps = np.linalg.norm(time_evolve_trotter(H, psi0, time=1.0, num_steps=50, order=1) - exact)
     assert err_many_steps < err_few_steps
 
 
@@ -48,10 +44,6 @@ def test_trotter_is_actually_approximate_not_exact():
 def test_trotter_higher_order_more_accurate_at_fixed_steps():
     """4th-order Suzuki should out-perform 1st-order Lie-Trotter at the same step count."""
     _, exact = time_evolve_naive(H, psi0, time=1.0)
-    err_order1 = np.linalg.norm(
-        time_evolve_trotter(H, psi0, time=1.0, num_steps=5, order=1) - exact
-    )
-    err_order4 = np.linalg.norm(
-        time_evolve_trotter(H, psi0, time=1.0, num_steps=5, order=4) - exact
-    )
+    err_order1 = np.linalg.norm(time_evolve_trotter(H, psi0, time=1.0, num_steps=5, order=1) - exact)
+    err_order4 = np.linalg.norm(time_evolve_trotter(H, psi0, time=1.0, num_steps=5, order=4) - exact)
     assert err_order4 < err_order1

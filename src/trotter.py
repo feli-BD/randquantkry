@@ -8,9 +8,7 @@ from randquantkry.utils.logging_config import get_logger
 log = get_logger(__name__)
 
 
-def time_evolve_trotter(
-    hamiltonian: SparsePauliOp, initial_state, time: float, num_steps: int, order=1
-):
+def time_evolve_trotter(hamiltonian: SparsePauliOp, initial_state, time: float, num_steps: int, order=1):
     """
     Time evolution via Trotter-Suzuki product-formula approximation, using
     Qiskit's synthesis machinery.

@@ -163,9 +163,7 @@ def configure_logging(
         file_handler.setLevel(file_level)
         file_handler.setFormatter(JsonLinesFormatter())
         logger.addHandler(file_handler)
-        logger.info(
-            "logging configured", extra={"context": {"json_path": str(json_path)}}
-        )
+        logger.info("logging configured", extra={"context": {"json_path": str(json_path)}})
     else:
         logger.info("logging configured (console only)")
 

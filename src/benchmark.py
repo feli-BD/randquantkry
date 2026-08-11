@@ -87,7 +87,6 @@ class Benchmark:
         seed=None,
         output_dir="results",
     ):
-
         self.H = hamiltonian
         self.initial_state = initial_state
         self.time = time
@@ -96,18 +95,14 @@ class Benchmark:
         self.methods = list(methods) if methods is not None else list(ALL_METHODS)
         unknown = set(self.methods) - set(ALL_METHODS)
         if unknown:
-            raise ValueError(
-                f"Unknown method(s) {sorted(unknown)}; valid options are {ALL_METHODS}"
-            )
+            raise ValueError(f"Unknown method(s) {sorted(unknown)}; valid options are {ALL_METHODS}")
         self.trotter_kwargs = trotter_kwargs or {"num_steps": 100, "order": 1}
         self.seed = seed
         self.output_dir = Path(f"../{output_dir}").resolve()
 
     def _resolve_krylov_dim(self, n_qubits: int):
         N = 2**n_qubits
-        krylov_dim = (
-            self.krylov_dim(n_qubits) if callable(self.krylov_dim) else self.krylov_dim
-        )
+        krylov_dim = self.krylov_dim(n_qubits) if callable(self.krylov_dim) else self.krylov_dim
         if krylov_dim >= N:
             log.warning(
                 "krylov_dim exceeds or equals N=2**n_qubits; clamping to N-1 "
@@ -129,9 +124,7 @@ class Benchmark:
             number_rand_vectors = 2 * krylov_dim + 1
         else:
             number_rand_vectors = (
-                self.num_random_vectors(krylov_dim)
-                if callable(self.num_random_vectors)
-                else self.num_random_vectors
+                self.num_random_vectors(krylov_dim) if callable(self.num_random_vectors) else self.num_random_vectors
             )
         if number_rand_vectors > N:
             log.warning(
@@ -176,9 +169,7 @@ class Benchmark:
                     "'naive' skipped...",
                     extra={"context": {"n_qubits": hamiltonian.num_qubits}},
                 )
-                raise ValueError(
-                    f"naive method requires n_qubits <= {MAX_NAIVE_QUBITS}, got {hamiltonian.num_qubits}"
-                )
+                raise ValueError(f"naive method requires n_qubits <= {MAX_NAIVE_QUBITS}, got {hamiltonian.num_qubits}")
         elif method == "krylov":
             state = time_evolve_krylov(hamiltonian, initial_state, time, krylov_dim)
         elif method == "randomized_krylov":
@@ -200,9 +191,7 @@ class Benchmark:
                 seed=self.seed,
             )
         elif method == "trotter":
-            state = time_evolve_trotter(
-                hamiltonian, initial_state, time, **self.trotter_kwargs
-            )
+            state = time_evolve_trotter(hamiltonian, initial_state, time, **self.trotter_kwargs)
         else:
             raise ValueError(f"Unknown method {method!r}")
         runtime = perf_counter() - t0
@@ -260,9 +249,7 @@ class Benchmark:
             states.append(state)
 
             if len(states) > 1:
-                diff = np.linalg.norm(states[-1] - states[-2]) / np.linalg.norm(
-                    states[-1]
-                )
+                diff = np.linalg.norm(states[-1] - states[-2]) / np.linalg.norm(states[-1])
                 diffs.append(float(diff))
                 if diff < tol and converged_at is None:
                     converged_at = m
@@ -389,9 +376,7 @@ class Benchmark:
         """
 
         if self.H.num_qubits <= 10:
-            _, exact_state = time_evolve_naive(
-                self.H, self.initial_state, self.time
-            )  # real ground truth
+            _, exact_state = time_evolve_naive(self.H, self.initial_state, self.time)  # real ground truth
             ground_truth_kind = "exact"
             exact_norm = np.linalg.norm(exact_state)
 
@@ -409,9 +394,7 @@ class Benchmark:
                 convergence_dims,
                 tol=tol,
             )
-            exact_state = conv["states"][
-                -1
-            ]  # best available proxy: largest converged run
+            exact_state = conv["states"][-1]  # best available proxy: largest converged run
             exact_norm = np.linalg.norm(exact_state)
             ground_truth_kind = "self_convergence"
 
@@ -435,7 +418,7 @@ class Benchmark:
                     "ground_truth": ground_truth_kind,
                 }
             except (
-                Exception # noqa: BLE001 —> one method failing shouldn't abort the whole validate_accuracy sweep
+                Exception  # noqa: BLE001 —> one method failing shouldn't abort the whole validate_accuracy sweep
             ) as e:
                 results[method] = {
                     "rel_error": None,
@@ -455,9 +438,7 @@ class Benchmark:
             )
         return results
 
-    def estimate_memory_gb(
-        self, krylov_dim: int, n_hamiltonian_terms: int, num_random_vectors: int | None
-    ):
+    def estimate_memory_gb(self, krylov_dim: int, n_hamiltonian_terms: int, num_random_vectors: int | None):
         N = 2**self.H.num_qubits
         BYTES_PER_COMPLEX128 = 16
         sparse_H_gb = (n_hamiltonian_terms * N * (BYTES_PER_COMPLEX128 + 8)) / 1e9
@@ -528,9 +509,7 @@ class Benchmark:
 
         log.info(
             "benchmark: starting",
-            extra={
-                "context": {"n_qubits_list": list(n_qubits_list), "methods": methods}
-            },
+            extra={"context": {"n_qubits_list": list(n_qubits_list), "methods": methods}},
         )
 
         results = {
@@ -545,9 +524,7 @@ class Benchmark:
         }
 
         for n_qubits in n_qubits_list:
-            hamiltonian, initial_state, krylov_dim, number_rand_vectors = (
-                self._adjust_run_nqubits(n_qubits)
-            )
+            hamiltonian, initial_state, krylov_dim, number_rand_vectors = self._adjust_run_nqubits(n_qubits)
 
             for method in methods:
                 results[method]["n_qubits"].append(n_qubits)
@@ -602,15 +579,11 @@ class Benchmark:
                             )
                             else None
                         ),
-                        "num_random_vectors": (
-                            number_rand_vectors if "randomized" in method else None
-                        ),
+                        "num_random_vectors": (number_rand_vectors if "randomized" in method else None),
                         "runtime_sec": runtime,
                         "memory_gb_measured": measured_mem_gb,
                         "memory_rss": peak_rss[0],
-                        "evolved_state_norm": (
-                            float(np.linalg.norm(state)) if state is not None else None
-                        ),
+                        "evolved_state_norm": (float(np.linalg.norm(state)) if state is not None else None),
                     }
                     append_result_row(run_dir, row)
 
@@ -626,7 +599,7 @@ class Benchmark:
                     )
 
                 except (
-                    Exception # noqa: BLE001 —> one sweep point failing shouldn't abort the whole benchmark run
+                    Exception  # noqa: BLE001 —> one sweep point failing shouldn't abort the whole benchmark run
                 ) as e:
                     log.warning(
                         "benchmark: method failed, recording None",
@@ -645,9 +618,7 @@ class Benchmark:
                     try:
                         tracemalloc.stop()
                     except RuntimeError:
-                        log.debug(
-                            "benchmark: tracemalloc.stop() called with no active trace"
-                        )
+                        log.debug("benchmark: tracemalloc.stop() called with no active trace")
 
                     # Record failed
                     error_row = {
@@ -765,13 +736,10 @@ class Benchmark:
         )
 
         for n_qubits in n_qubits_list:
-            hamiltonian, initial_state, krylov_dim, number_rand_vectors = (
-                self._adjust_run_nqubits(n_qubits)
-            )
+            hamiltonian, initial_state, krylov_dim, number_rand_vectors = self._adjust_run_nqubits(n_qubits)
             N = 2**n_qubits
 
             for time in time_list:
-
                 if n_qubits <= MAX_NAIVE_QUBITS:
                     _, exact_state = time_evolve_naive(hamiltonian, initial_state, time)
                     ground_truth_kind = "exact"
@@ -794,9 +762,7 @@ class Benchmark:
                         self.trotter_kwargs["num_steps"],
                         self.trotter_kwargs["order"],
                     )
-                    exact_state = time_evolve_trotter(
-                        hamiltonian, initial_state, time, num_steps, order
-                    )
+                    exact_state = time_evolve_trotter(hamiltonian, initial_state, time, num_steps, order)
                     ground_truth_kind = "trotter"
                     exact_norm = np.linalg.norm(exact_state)
 
@@ -832,9 +798,7 @@ class Benchmark:
                         tracemalloc.stop()
                         mem = peak / 1e9
                         rel_error = (
-                            float(np.linalg.norm(state - exact_state) / exact_norm)
-                            if exact_state is not None
-                            else None
+                            float(np.linalg.norm(state - exact_state) / exact_norm) if exact_state is not None else None
                         )
                         evolved_state_norm = float(np.linalg.norm(state))
                         row = {

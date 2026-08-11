@@ -22,7 +22,7 @@ def test_build_hamiltonian_matches_intuitive_tensor_product():
     """Placing a Pauli at position k should yield P_0 (x) P_1 (x) ... when
     converted to a matrix. This is the core correctness property we spent
     significant effort verifying (see: endianness discussion)."""
-    I = np.eye(2) # noqa: E741 —> standard notation alongside Pauli matrices X, Z
+    I = np.eye(2)  # noqa: E741 —> standard notation alongside Pauli matrices X, Z
     X = np.array([[0, 1], [1, 0]])
     Z = np.array([[1, 0], [0, -1]])
 

@@ -100,9 +100,7 @@ def _df_to_results(df, x="n_qubits", y_col="memory_gb", hue="method"):
         results[label] = {
             "n_qubits": group_sorted[x].tolist(),
             y_col: group_sorted[y_col].tolist(),
-            "_base_method": (
-                group_sorted["method"].iloc[0] if "method" in group_sorted else label
-            ),
+            "_base_method": (group_sorted["method"].iloc[0] if "method" in group_sorted else label),
         }
     return results
 
@@ -174,15 +172,9 @@ def plot_runtime(
             continue
 
         base_method = results[label].get("_base_method", label)
-        style = METHOD_STYLE.get(
-            base_method, {"color": "gray", "marker": "o", "linestyle": "-"}
-        )
+        style = METHOD_STYLE.get(base_method, {"color": "gray", "marker": "o", "linestyle": "-"})
 
-        display_label = (
-            f"{base_method}{app[base_method]}"
-            if base_method in app and label == base_method
-            else label
-        )
+        display_label = f"{base_method}{app[base_method]}" if base_method in app and label == base_method else label
 
         xs, ys = _filtered_xy(results[label]["n_qubits"], results[label][key])
         if not xs:
@@ -279,18 +271,12 @@ def plot_memory(
             continue
 
         base_method = results[label].get("_base_method", label)
-        style = METHOD_STYLE.get(
-            base_method, {"color": "gray", "marker": "o", "linestyle": "-"}
-        )
+        style = METHOD_STYLE.get(base_method, {"color": "gray", "marker": "o", "linestyle": "-"})
 
         # Only apply the hardcoded DIM/NRV suffix for a plain method name with
         # no per-row s_ratio already baked into the label (df path supplies its
         # own, more accurate, "(s_ratio=...)" suffix when relevant).
-        display_label = (
-            f"{base_method}{app[base_method]}"
-            if base_method in app and label == base_method
-            else label
-        )
+        display_label = f"{base_method}{app[base_method]}" if base_method in app and label == base_method else label
 
         xs, ys = _filtered_xy(results[label]["n_qubits"], results[label][key])
         if not xs:
@@ -310,9 +296,7 @@ def plot_memory(
 
     if ram_limits:
         for label, gb_value in ram_limits.items():
-            ax.axhline(
-                gb_value, color="firebrick", linestyle="--", linewidth=1.5, alpha=0.8
-            )
+            ax.axhline(gb_value, color="firebrick", linestyle="--", linewidth=1.5, alpha=0.8)
             ax.text(
                 ax.get_xlim()[1] if ax.get_xlim()[1] > 0 else 1,
                 gb_value,
@@ -324,9 +308,7 @@ def plot_memory(
             )
 
     ax.set_yscale("log")
-    ylabel = "Memory (Gigabytes, log-scale)" + (
-        " -- memory_tmalloc" if not memory_rss else " -- memory_rss"
-    )
+    ylabel = "Memory (Gigabytes, log-scale)" + (" -- memory_tmalloc" if not memory_rss else " -- memory_rss")
     _apply_base_style(ax, xlabel="Number of Qubits", ylabel=ylabel, title=title)
     ax.legend(fontsize=10, frameon=True, framealpha=0.9, loc="upper left")
     plt.tight_layout()
@@ -374,17 +356,13 @@ def plot_parameter_study(
         for col, val in fixed.items():
             data = data[data[col] == val]
     if data.empty:
-        raise ValueError(
-            f"No rows match fixed={fixed} -- check your filter values against df's actual contents."
-        )
+        raise ValueError(f"No rows match fixed={fixed} -- check your filter values against df's actual contents.")
 
     # 2. Handle s_ratio safeguards
     if x == "s_ratio":
         data = data.dropna(subset=["s_ratio"])
         if data.empty:
-            raise ValueError(
-                "No rows have a non-null s_ratio after filtering -- did you mean to include 'krylov'?"
-            )
+            raise ValueError("No rows have a non-null s_ratio after filtering -- did you mean to include 'krylov'?")
         hue_col = "method"
     elif hue == "method" and "s_ratio" in data.columns:
 
@@ -444,15 +422,11 @@ def plot_parameter_study(
 
     if target_save_path is None and run_dir is not None:
         target_dir = Path(run_dir) / "plots"
-        target_dir.mkdir(
-            parents=True, exist_ok=True
-        )  # Creates run_dir/plots if missing
+        target_dir.mkdir(parents=True, exist_ok=True)  # Creates run_dir/plots if missing
 
         # Generate a descriptive filename if not specified
         if not filename:
-            fixed_suffix = (
-                "_" + "_".join(f"{k}{v}" for k, v in fixed.items()) if fixed else ""
-            )
+            fixed_suffix = "_" + "_".join(f"{k}{v}" for k, v in fixed.items()) if fixed else ""
             filename = f"{y}_vs_{x}{fixed_suffix}.png"
 
         target_save_path = target_dir / filename

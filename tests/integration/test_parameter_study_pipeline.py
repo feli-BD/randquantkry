@@ -1,9 +1,7 @@
 import pandas as pd
 
 
-def test_parameter_study_returns_dataframe_with_expected_columns(
-    small_hamiltonian, small_initial_state, tmp_path
-):
+def test_parameter_study_returns_dataframe_with_expected_columns(small_hamiltonian, small_initial_state, tmp_path):
     from randquantkry.benchmark import Benchmark
 
     b = Benchmark(
@@ -38,9 +36,7 @@ def test_parameter_study_returns_dataframe_with_expected_columns(
     assert expected_cols.issubset(df.columns)
 
 
-def test_parameter_study_skips_krylov_dim_above_N(
-    small_hamiltonian, small_initial_state, tmp_path
-):
+def test_parameter_study_skips_krylov_dim_above_N(small_hamiltonian, small_initial_state, tmp_path):
     """n_qubits=4 -> N=16; krylov_dim=20 should be silently skipped, not crash."""
     from randquantkry.benchmark import Benchmark
 
@@ -61,14 +57,10 @@ def test_parameter_study_skips_krylov_dim_above_N(
         time_list=[1.0],
         methods=("krylov",),
     )
-    assert (
-        20 not in df["krylov_dim"].values
-    )  # confirms the >= N skip logic actually fires
+    assert 20 not in df["krylov_dim"].values  # confirms the >= N skip logic actually fires
 
 
-def test_parameter_study_rel_error_present_when_naive_feasible(
-    small_hamiltonian, small_initial_state, tmp_path
-):
+def test_parameter_study_rel_error_present_when_naive_feasible(small_hamiltonian, small_initial_state, tmp_path):
     """n_qubits <= MAX_NAIVE_QUBITS should give exact ground truth, so rel_error should be a real number, not None."""
     from randquantkry.benchmark import Benchmark
 
@@ -90,6 +82,4 @@ def test_parameter_study_rel_error_present_when_naive_feasible(
         methods=("krylov",),
     )
     assert df["rel_error"].notna().all()
-    assert (
-        df["rel_error"] < 1.0
-    ).all()  # sanity: error shouldn't be enormous for a reasonable krylov_dim
+    assert (df["rel_error"] < 1.0).all()  # sanity: error shouldn't be enormous for a reasonable krylov_dim
