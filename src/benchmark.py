@@ -560,7 +560,7 @@ class Benchmark:
                     tracemalloc.stop()
 
                     measured_mem_gb = tracemalloc_peak / 1e9
-                    results[method]["memory_gb_measured"].append(measured_mem_gb)
+                    results[method]["memory_gb"].append(measured_mem_gb)
                     results[method]["memory_rss"].append(peak_rss[0] / 1e9)
 
                     results[method]["runtime_sec"].append(runtime)
@@ -581,7 +581,7 @@ class Benchmark:
                         ),
                         "num_random_vectors": (number_rand_vectors if "randomized" in method else None),
                         "runtime_sec": runtime,
-                        "memory_gb_measured": measured_mem_gb,
+                        "memory_gb": measured_mem_gb,
                         "memory_rss": peak_rss[0],
                         "evolved_state_norm": (float(np.linalg.norm(state)) if state is not None else None),
                     }
@@ -613,7 +613,7 @@ class Benchmark:
                     )
                     results[method]["runtime_sec"].append(None)
                     results[method]["state"].append(None)
-                    results[method]["memory_gb_measured"].append(None)
+                    results[method]["memory_gb"].append(None)
                     results[method]["memory_rss"].append(None)
                     try:
                         tracemalloc.stop()
