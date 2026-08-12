@@ -51,21 +51,21 @@ and a **fast randomized sketch** (`randomized krylov`) using Güttel & Schweitze
 ## Installation
 
 This project uses [`uv`](https://github.com/astral-sh/uv) for fast, reproducible dependency
-management.
+management. Make sure you have `uv` installed.
 
 **Just want to run the code** (no tests, linting, or docs tooling):
 
 ```bash
-git clone <repo-url>
+git clone https://gitlab.git.nrw/felicia.erb/randquantkry.git # <- https clone for ssh clone replace repo link with: git@gitlab.git.nrw:felicia.erb/randquantkry.git
 cd randquantkry
 uv sync --no-dev
 ```
 
-**Contributing, testing, or grading this project** (installs pytest, ruff, black, and the docs
+**Contributing to this project** (installs pytest, ruff, black, and the docs
 toolchain in addition to the core dependencies):
 
 ```bash
-git clone <repo-url>
+git clone https://gitlab.git.nrw/felicia.erb/randquantkry.git # <- https clone for ssh clone replace repo link with: git@gitlab.git.nrw:felicia.erb/randquantkry.git
 cd randquantkry
 uv sync --extra dev
 ```
@@ -73,7 +73,6 @@ uv sync --extra dev
 To use notebooks with this project's environment (RECOMMENDED):
 
 ```bash
-uv add --dev ipykernel
 uv run python -m ipykernel install --user --name randquantkry --display-name "randquantkry (uv)"
 ```
 

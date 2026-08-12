@@ -23,7 +23,6 @@ uv sync --extra dev
 To use notebooks with this project's environment (RECOMMENDED):
 
 ```bash
-uv add --dev ipykernel
 uv run python -m ipykernel install --user --name randquantkry --display-name "randquantkry (uv)"
 ```
 
