@@ -36,7 +36,7 @@ def test_time_evolve_naive_matches_scipy_expm(small_hamiltonian, small_initial_s
 def test_naive_raises_when_memory_insufficient():
     """Test that time_evolve_naive raises a ValueError when the Hamiltonian is too large to fit in memory."""
     H_huge = build_hamiltonian(50, [("Z", 0, 1.0)])
-    psi_huge = build_initial_state(14, 0)
+    psi_huge = build_initial_state(50, 0)
     with pytest.raises(ValueError, match="exceeds available system memory"):
         time_evolve_naive(H_huge, psi_huge, time=1.0)
 
