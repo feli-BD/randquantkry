@@ -3,25 +3,27 @@
 Auto-generated from docstrings. Grouped by what each module is responsible for â€” see the
 [project structure](index.md#project-structure) for how these map onto `src/` and `utils/`.
 
-## Core: Hamiltonians & Time Evolution
-
-### Hamiltonian construction
+## Hamiltonian construction
 
 ::: randquantkry.hamiltonian
 
-### Time evolution (`naive`, `krylov`, `randomized_krylov`, `randomized_krylov_gaussian`)
+## Time evolution 
+
+### Classical Methods (`naive`, `krylov`, `randomized_krylov`, `randomized_krylov_gaussian`)
 
 ::: randquantkry.evolution
 
-### Trotter-Suzuki product formula
+### Quantum Methods (`Trotter-Suzuki product formula`)
 
 ::: randquantkry.trotter
 
-## Analysis & benchmarking
+## Parameter Study and Benchmarking
 
 ### Benchmark suite
 
 ::: randquantkry.benchmark
+
+## Plotting and Observables
 
 ### Post-processing
 
@@ -41,6 +43,25 @@ Auto-generated from docstrings. Grouped by what each module is responsible for â
 
 ::: utils.logging_config
 
-### Metadata file generation
+### Table of all runs with metadata generator
 
 ::: utils.meta_metadata_file_generator
+
+## Tests
+
+### Unit tests
+
+::: tests.unit.test_hamiltonian
+
+::: tests.unit.test_evolution
+
+::: tests.unit.test_benchmark
+
+::: tests.unit.test_trotter
+
+::: tests.unit.test_post_processing
+
+### Integration tests
+
+::: tests.integration.test_parameter_study_pipeline
+

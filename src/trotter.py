@@ -1,3 +1,10 @@
+#############################################################################
+#
+#           Trotter-Suzuki Time Evolution Function  
+#
+#############################################################################
+
+# Imports
 import numpy as np
 from qiskit import QuantumCircuit
 from qiskit.circuit.library import PauliEvolutionGate

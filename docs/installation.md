@@ -6,7 +6,7 @@ management.
 **Just want to run the code** (no tests, linting, or docs tooling):
 
 ```bash
-git clone <repo-url>
+git clone https://gitlab.git.nrw/felicia.erb/randquantkry.git # <- https clone for ssh clone replace repo link with: git@gitlab.git.nrw:felicia.erb/randquantkry.git
 cd randquantkry
 uv sync --no-dev
 ```
@@ -15,7 +15,7 @@ uv sync --no-dev
 toolchain in addition to the core dependencies):
 
 ```bash
-git clone <repo-url>
+git clone https://gitlab.git.nrw/felicia.erb/randquantkry.git # <- https clone for ssh clone replace repo link with: git@gitlab.git.nrw:felicia.erb/randquantkry.git
 cd randquantkry
 uv sync --extra dev
 ```

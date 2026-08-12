@@ -35,10 +35,11 @@ def time_evolve_naive(
         The initial state of the quantum system.
     time : float
         The final simulation time.
-    memory_buffer_qubits : int, default 2
+    memory_buffer_qubits : int, default 0
         Safety margin subtracted (in qubit-equivalent terms) from the
         available-RAM-based qubit limit, to leave headroom for other
-        allocations (eigenvectors, temporaries, other processes).
+        allocations (eigenvectors, temporaries, other processes). 
+        Use this if you run into problems with your local machine crashing.
 
     Returns
     -------
@@ -58,15 +59,14 @@ def time_evolve_naive(
     matrix_dim = 2**n_qubits
 
     # Naive method needs: the dense Hamiltonian (complex128, 16 bytes/entry)
-    # AND the eigenvector matrix of the same size AND some working memory
+    # and the eigenvector matrix of the same size and some working memory
     # for np.linalg.eigh's internal LAPACK buffers. Budget ~3x the matrix
     # size as a rough estimate.
     estimated_bytes_needed = 3 * (matrix_dim**2) * 16
     available_bytes = psutil.virtual_memory().available
 
     # Apply the qubit buffer: require the estimate to fit within available
-    # memory as if the qubit count were `memory_buffer_qubits` higher, so
-    # we bail out before actually hitting the wall, not right at it.
+    # memory as if the qubit count were `memory_buffer_qubits` higher.
     buffered_matrix_dim = 2 ** (n_qubits + memory_buffer_qubits)
     buffered_estimate = 3 * (buffered_matrix_dim**2) * 16
 

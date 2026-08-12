@@ -4,6 +4,7 @@
 #                  Bridge between quantum and classical Observables
 #
 ###########################################################################
+"""Functions to compute observables from quantum state evolution, and to visualize them."""
 
 # imports
 import matplotlib.pyplot as plt

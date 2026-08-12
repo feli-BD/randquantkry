@@ -101,6 +101,7 @@ class Benchmark:
         self.output_dir = Path(f"../{output_dir}").resolve()
 
     def _resolve_krylov_dim(self, n_qubits: int):
+        """Helper function: resolve the krylov_dim for a given n_qubits, clamping to N-1 if necessary."""
         N = 2**n_qubits
         krylov_dim = self.krylov_dim(n_qubits) if callable(self.krylov_dim) else self.krylov_dim
         if krylov_dim >= N:
@@ -119,6 +120,10 @@ class Benchmark:
         return krylov_dim
 
     def _resolve_num_random_vectors(self, krylov_dim: int, n_qubits: int):
+        """
+        Helper function: resolve the num_random_vectors for a given krylov_dim and n_qubits,
+        clamping to N if necessary.
+        """
         N = 2**n_qubits
         if self.num_random_vectors is None:
             number_rand_vectors = 2 * krylov_dim + 1
@@ -142,8 +147,10 @@ class Benchmark:
         return number_rand_vectors
 
     def _adjust_run_nqubits(self, n_qubits: int):
-        """Construct everything needed for one n_qubits run: Hamiltonian,
-        initial state, and resolved krylov_dim/num_random_vectors."""
+        """
+        Helper Function: Construct everything needed for one n_qubits run: Hamiltonian,
+        initial state, and resolved krylov_dim/num_random_vectors.
+        """
         hamiltonian = reconstruct_hamiltonian(n_qubits, self.H)
         initial_state = build_initial_state(n_qubits, flipped_qubit=0)
         krylov_dim = self._resolve_krylov_dim(n_qubits)
@@ -159,7 +166,30 @@ class Benchmark:
         krylov_dim: int,
         number_rand_vectors: int | None,
     ):
-        """Run a single method, returning (state, runtime_sec)"""
+        """
+        Run a single method:
+        Parameters
+        ----------
+        method : str
+            The method to run.
+        hamiltonian : SparsePauliOp
+            The Hamiltonian object.
+        initial_state : array-like
+            The initial state of the quantum system.
+        time : float
+            The final evolution time.
+        krylov_dim : int
+            The dimension of the Krylov subspace.
+        number_rand_vectors : int | None
+            The number of random vectors to use.
+
+        Returns
+        -------
+        state : array-like
+            The evolved state of the quantum system.
+        runtime : float
+            The runtime in seconds.
+        """
         t0 = perf_counter()
         if method == "naive":
             if hamiltonian.num_qubits <= MAX_NAIVE_QUBITS:
@@ -439,6 +469,7 @@ class Benchmark:
         return results
 
     def estimate_memory_gb(self, krylov_dim: int, n_hamiltonian_terms: int, num_random_vectors: int | None):
+        """Estimate memory usage in GB for a given krylov_dim and number of random vectors."""
         N = 2**self.H.num_qubits
         BYTES_PER_COMPLEX128 = 16
         sparse_H_gb = (n_hamiltonian_terms * N * (BYTES_PER_COMPLEX128 + 8)) / 1e9
@@ -464,6 +495,7 @@ class Benchmark:
         return result
 
     def _measure_with_rss(fn, *args, **kwargs):
+        """Helper function: measure runtime and peak RSS memory usage of a function call."""
         process = psutil.Process(os.getpid())
         peak = [process.memory_info().rss]
         stop = threading.Event()
@@ -486,13 +518,25 @@ class Benchmark:
         Combined runtime + memory sweep. Runs each (n_qubits, method) point ONCE,
         recording wall-clock runtime and theoretical memory always.
 
-        Returns a single results dict compatible with BOTH plot_runtime(results)
-        and plot_memory(results) -- no need to run the sweep twice to get both plots.
-
         NOTE: tracemalloc's own tracing overhead adds
         a small, real bias to the measured runtime_sec for that run. If you need
         a clean runtime number AND empirical memory, prefer two separate calls
         rather than reading runtime_sec from an empirical=True run.
+
+        Parameters
+        ----------
+        n_qubits_list : list of int
+            List of system sizes to benchmark.
+        methods : list of str, optional
+            Subset of methods to benchmark. Defaults to `self.methods`.           
+
+        Returns
+        -------
+        results : dict
+            Nested dictionary of results, keyed by method, then by metric.
+            Each metric is a list of values corresponding to the n_qubits_list.
+        run_dir : Path
+            Path to the directory where results were logged.
         """
         methods = methods or self.methods
         seed_val = self.seed
