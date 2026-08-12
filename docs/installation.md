@@ -11,7 +11,7 @@ cd randquantkry
 uv sync --no-dev
 ```
 
-**Contributing, testing, or grading this project** (installs pytest, ruff, black, and the docs
+**Contributing to this project** (installs pytest, ruff, black, and the docs
 toolchain in addition to the core dependencies):
 
 ```bash
@@ -46,7 +46,7 @@ uv run pytest --cov=randquantkry
 ```
 
 To test the CI pipeline itself locally before pushing (catches YAML/config issues without
-waiting for a real pipeline run), please note you need a  gitlab-ci-local setup to run this:
+waiting for a real pipeline run), please note you need a gitlab-ci-local setup to run this:
 
 ```bash
 gitlab-ci-local              # full pipeline
