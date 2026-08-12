@@ -377,7 +377,7 @@ def time_evolve_randomized_krylov(
     M = SVw.conj().T @ SVw
     M_pinv = np.linalg.pinv(M)
     H_tilde = M_pinv @ (SVw.conj().T @ SAVw)
-    log.info(
+    log.debug(
         "time_evolve_randomized_krylov: H_tilde built",
         extra={
             "context": {

@@ -513,7 +513,7 @@ class Benchmark:
         t.join()
         return result, runtime, peak[0]
 
-    def benchmark(self, n_qubits_list, methods=None):
+    def benchmark(self, n_qubits_list, methods=None, memory_type = None):
         """
         Combined runtime + memory sweep. Runs each (n_qubits, method) point ONCE,
         recording wall-clock runtime and theoretical memory always.
@@ -529,7 +529,9 @@ class Benchmark:
             List of system sizes to benchmark.
         methods : list of str, optional
             Subset of methods to benchmark. Defaults to `self.methods`.           
-
+        memory_type : str, optional
+            Type of memory to estimate.
+            Options: "tracemalloc" or "peak_rss". If None, defaults to "tracemalloc".
         Returns
         -------
         results : dict
@@ -567,6 +569,9 @@ class Benchmark:
             for method in methods
         }
 
+        if memory_type == None:
+            memory_type = "tracemalloc"
+
         for n_qubits in n_qubits_list:
             hamiltonian, initial_state, krylov_dim, number_rand_vectors = self._adjust_run_nqubits(n_qubits)
 
@@ -576,37 +581,58 @@ class Benchmark:
                 # measures runtime, wrapped in tracemalloc
                 measured_mem_gb = None
                 try:
-                    tracemalloc.start()
-                    process = psutil.Process(os.getpid())
-                    rss_baseline = process.memory_info().rss
-                    peak_rss = [rss_baseline]
-                    stop = threading.Event()
+                    if memory_type == "tracemalloc":
+                        tracemalloc.start()    
+                        state, runtime = self._run_method(
+                                                method,
+                                                hamiltonian,
+                                                initial_state,
+                                                self.time,
+                                                krylov_dim,
+                                                number_rand_vectors,
+                                            )
+                        _, tracemalloc_peak = tracemalloc.get_traced_memory()
+                        tracemalloc.stop()
+                        measured_mem_gb = tracemalloc_peak / 1e9
+                        results[method]["memory_gb"].append(measured_mem_gb)
+                        results[method]["memory_rss"].append(None)
+                        
+                    elif memory_type == "peak_rss":
+                        process = psutil.Process(os.getpid())
+                        rss_baseline = process.memory_info().rss
+                        peak_rss = [rss_baseline]
+                        stop = threading.Event()
 
-                    def sampler(stop=stop, peak_rss=peak_rss, process=process):
-                        while not stop.is_set():
-                            peak_rss[0] = max(peak_rss[0], process.memory_info().rss)
+                        def sampler(stop=stop, peak_rss=peak_rss, process=process):
+                            while not stop.is_set():
+                                peak_rss[0] = max(peak_rss[0], process.memory_info().rss)
 
-                    t = threading.Thread(target=sampler)
-                    t.start()
+                        t = threading.Thread(target=sampler)
+                        t.start()
 
-                    state, runtime = self._run_method(
-                        method,
-                        hamiltonian,
-                        initial_state,
-                        self.time,
-                        krylov_dim,
-                        number_rand_vectors,
-                    )
+                        state, runtime = self._run_method(
+                            method,
+                            hamiltonian,
+                            initial_state,
+                            self.time,
+                            krylov_dim,
+                            number_rand_vectors,
+                        )
 
-                    stop.set()
-                    t.join()
-                    _, tracemalloc_peak = tracemalloc.get_traced_memory()
-                    tracemalloc.stop()
+                        stop.set()
+                        t.join()
 
-                    measured_mem_gb = tracemalloc_peak / 1e9
-                    results[method]["memory_gb"].append(measured_mem_gb)
-                    results[method]["memory_rss"].append(peak_rss[0] / 1e9)
-
+                        results[method]["memory_gb"].append(None)
+                        results[method]["memory_rss"].append(peak_rss[0] / 1e9)
+    
+                    else:
+                        log.warning(
+                                    "benchmark: unknown memory_type, defaulting to tracemalloc",
+                                    extra={"context": {"memory_type": memory_type}},
+                                )
+                        raise ValueError(f"Unknown memory_type {memory_type!r}; valid options are 'tracemalloc' or 'peak_rss'")
+                        
+                    
                     results[method]["runtime_sec"].append(runtime)
                     results[method]["state"].append(state)
                     row = {
@@ -625,8 +651,8 @@ class Benchmark:
                         ),
                         "num_random_vectors": (number_rand_vectors if "randomized" in method else None),
                         "runtime_sec": runtime,
-                        "memory_gb": measured_mem_gb,
-                        "memory_rss": peak_rss[0],
+                        "memory_gb": measured_mem_gb if memory_type == "tracemalloc" else None,
+                        "memory_rss": peak_rss[0] if memory_type == "peak_rss" else None,
                         "evolved_state_norm": (float(np.linalg.norm(state)) if state is not None else None),
                     }
                     append_result_row(run_dir, row)
