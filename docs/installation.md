@@ -20,7 +20,7 @@ cd randquantkry
 uv sync --extra dev
 ```
 
-To use notebooks with this project's environment (RECOMMENDED):
+If you are running into issues with the Jupyter Notebooks, try this (RECOMMENDED):
 
 ```bash
 uv run python -m ipykernel install --user --name randquantkry --display-name "randquantkry (uv)"
