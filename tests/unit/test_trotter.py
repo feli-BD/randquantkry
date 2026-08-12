@@ -1,3 +1,14 @@
+#############################################################################
+#
+#       Unit Tests for the functionalities in trotter.py
+#
+#############################################################################
+
+"""Unit tests for the functionalities in trotter.py:
+- time_evolve_trotter
+"""
+
+# Imports
 import numpy as np
 from randquantkry.evolution import time_evolve_naive
 from randquantkry.hamiltonian import build_hamiltonian, build_initial_state
@@ -8,6 +19,7 @@ psi0 = build_initial_state(3, 0)
 
 
 def test_trotter_preserves_norm():
+    """Test that time_evolve_trotter preserves the norm of the state vector."""
     state = time_evolve_trotter(H, psi0, time=1.0, num_steps=10, order=1)
     assert np.isclose(np.linalg.norm(state), 1.0, atol=1e-8)
 

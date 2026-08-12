@@ -1,11 +1,19 @@
 #############################################################################
 #
-#           Tests for the functionalities in hamiltonian.py:
+#           Unit Tests for the functionalities in hamiltonian.py:
 #       build_hamiltonian, reconstruct_hamiltonian, build_initial_state
 #                   Checksum Test for hamiltonian
 #
 #############################################################################
 
+"""Unit tests for the functionalities in hamiltonian.py:
+- build_hamiltonian
+- reconstruct_hamiltonian
+- build_initial_state
+- Checksum Test for hamiltonian
+"""
+
+# Imports
 import numpy as np
 import pytest
 from qiskit.exceptions import QiskitError
@@ -40,37 +48,44 @@ def test_build_hamiltonian_matches_intuitive_tensor_product():
 
 @pytest.mark.parametrize("n_qubits", [0, -1])
 def test_build_hamiltonian_rejects_invalid_n_qubits(n_qubits):
+    """Test that build_hamiltonian raises a ValueError for invalid n_qubits."""
     with pytest.raises(ValueError):
         build_hamiltonian(n_qubits, [("X", 0, 1.0)])
 
 
 def test_build_hamiltonian_rejects_empty_terms():
+    """Test that build_hamiltonian raises a QiskitError for empty terms."""
     with pytest.raises(QiskitError):
         build_hamiltonian(2, [])
 
 
 def test_build_hamiltonian_rejects_invalid_pauli_letter():
+    """Test that build_hamiltonian raises a QiskitError for invalid Pauli letters."""
     with pytest.raises(QiskitError):
         build_hamiltonian(2, [("XA", 0, 1.0)])
 
 
 def test_build_hamiltonian_rejects_negative_qubit():
+    """Test that build_hamiltonian raises a ValueError for negative qubit indices."""
     with pytest.raises(ValueError):
         build_hamiltonian(2, [("X", -1, 1.0)])
 
 
 def test_build_hamiltonian_correct_dim():
+    """Test that build_hamiltonian produces a Hamiltonian with the correct number of qubits."""
     H = build_hamiltonian(4, [("X", 0, 1.0)])
     assert H.num_qubits == 4
 
 
 def test_build_hamiltonian_hermitian():
+    """Test that build_hamiltonian produces a Hermitian Hamiltonian."""
     H = build_hamiltonian(4, [("XX", 0, 1.0), ("Z", 2, 0.5)])
     matrix = H.to_matrix()
     assert np.allclose(matrix, matrix.conj().T), "Hamiltonian must be Hermitian"
 
 
 def test_build_hamiltonian_out_of_range_raises():
+    """Test that build_hamiltonian raises a ValueError when a term references a qubit index out of range."""
     with pytest.raises(ValueError):
         build_hamiltonian(3, [("XX", 2, 1.0)])  # qubit+1=3 out of range for n=3
 
@@ -79,6 +94,7 @@ def test_build_hamiltonian_out_of_range_raises():
 
 
 def test_build_initial_state_unit_norm():
+    """Test that build_initial_state produces a state vector with unit norm."""
     psi0 = build_initial_state(4, 0)
     assert np.isclose(np.linalg.norm(psi0), 1.0)
 
@@ -87,6 +103,7 @@ def test_build_initial_state_unit_norm():
 
 
 def test_reconstruct_hamiltonian_faithful_roundtrip():
+    """Test that reconstruct_hamiltonian faithfully reconstructs the original Hamiltonian."""
     terms = [
         ("XX", 0, 1.0),
         ("Z", 0, 0.5),
@@ -97,6 +114,7 @@ def test_reconstruct_hamiltonian_faithful_roundtrip():
 
 
 def test_reconstruct_hamiltonian_uniform_spreads_to_all_positions():
+    """Test that reconstruct_hamiltonian with uniform=True spreads terms to all qubit positions."""
     terms = [("Z", 0, 0.5)]  # Z only at qubit 0
     H = build_hamiltonian(3, terms)
     H_reconstructed = reconstruct_hamiltonian(3, H, uniform=True)  # default
@@ -109,11 +127,13 @@ def test_reconstruct_hamiltonian_uniform_spreads_to_all_positions():
 
 
 def test_hash_terms_deterministic():
+    """Test that hash_terms produces the same hash for the same list of terms."""
     terms = [("XX", 0, 1.0), ("Z", 1, 0.5)]
     assert hash_terms(terms) == hash_terms(terms)
 
 
 def test_hash_terms_detects_change():
+    """Test that hash_terms produces different hashes for different lists of terms."""
     terms_a = [("XX", 0, 1.0)]
     terms_b = [("XX", 0, 1.0001)]  # tiny coefficient change
     assert hash_terms(terms_a) != hash_terms(terms_b)

@@ -1,3 +1,13 @@
+#############################################################################
+#
+#           Helper Functions for Unit Tests in randquantkry
+#
+#############################################################################
+
+"""Helper functions and fixtures for unit tests in randquantkry."""
+
+
+# Imports
 import numpy as np
 import pytest
 from qiskit.quantum_info import SparsePauliOp
@@ -29,6 +39,7 @@ def small_hamiltonian():
 
 @pytest.fixture
 def small_initial_state(small_hamiltonian):
+    """A simple initial state for the small_hamiltonian fixture."""
     n = small_hamiltonian.num_qubits
     psi0 = np.zeros(2**n, dtype=complex)
     psi0[0] = 1.0
@@ -46,11 +57,13 @@ def localized_hamiltonian():
 
 @pytest.fixture
 def large_hamiltonian():
+    """A  Hamiltonian that mixes the FULL Hilbert space (XX + XX + Z),"""
     return build_hamiltonian(4, [("XX", 0, 1.0), ("XX", 1, 1.0), ("Z", 0, 0.5)])
 
 
 @pytest.fixture
 def large_initial_state():
+    """A simple initial state for the large_hamiltonian fixture."""
     return build_initial_state(4, flipped_qubit=0)
 
 

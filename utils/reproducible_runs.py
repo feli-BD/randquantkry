@@ -7,11 +7,13 @@
 Each run gets its own timestamped directory containing:
   - metadata.json : sweep configuration, seed, package versions, git commit
   - results.jsonl : one JSON line per result row, written and flushed to disk
-                    IMMEDIATELY as each point is computed -- if the process
+                    IMMEDIATELY as each point is computed, if the process
                     dies partway through (OOM, crash, Ctrl+C), everything
                     computed so far is still safely on disk and loadable.
+  - run.log.jsonl : a JSON-lines file (one JSON object per line) that logs
+                    all run information.
 """
-
+# Imports
 import hashlib
 import json
 import os
@@ -20,15 +22,14 @@ import subprocess
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
-
 import numpy as np
 import pandas as pd
 import psutil
+import importlib.metadata
 
 
 def _get_package_versions(packages=("numpy", "scipy", "qiskit", "pandas")):
-    import importlib.metadata
-
+    """Get the versions of key packages used in this run."""
     versions = {}
     for pkg in packages:
         try:
@@ -39,6 +40,7 @@ def _get_package_versions(packages=("numpy", "scipy", "qiskit", "pandas")):
 
 
 def _get_git_commit():
+    """Get the current git commit hash, if available."""
     try:
         return (
             subprocess.check_output(
@@ -55,6 +57,7 @@ def _get_git_commit():
 
 
 def _get_hardware():
+    """Get basic hardware information, if available."""
     try:
         return {
             "platform": platform.platform(),
@@ -69,6 +72,7 @@ def _get_hardware():
 
 
 def _get_environment_metadata():
+    """Get metadata about the Python environment, including the lock file hash and BLAS backend."""
     repo_root = Path(__file__).resolve().parents[1]
     lock_path = repo_root / "uv.lock"
     metadata = {
@@ -84,6 +88,7 @@ def _get_environment_metadata():
 
 
 def _hash_file(path: str) -> str:
+    """Helper function: Compute the SHA256 hash of a file."""
     h = hashlib.sha256()
     with open(path, "rb") as f:
         h.update(f.read())
@@ -210,7 +215,6 @@ def load_run(run_dir):
 
 
 # Hash term for checksum calculation
-
 
 def hash_terms(terms: list[tuple[str, int, float]]) -> str:
     """Checksums for verifying experiment inputs haven't

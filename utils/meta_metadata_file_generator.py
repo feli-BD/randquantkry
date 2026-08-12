@@ -1,6 +1,16 @@
+##########################################################################
+#
+#            Create a master index of all runs in the results folder, 
+#               by scanning for metadata.json files
+#
+###########################################################################
+"""
+A script to scan the results folder for all runs and create a master index of their metadata.
+The index is saved as a CSV file and a Markdown table for easy viewing in VS Code.
+"""
+#imports
 import json
 from pathlib import Path
-
 import pandas as pd
 
 
@@ -12,6 +22,18 @@ def _format_list(val_list: list) -> str:
 
 
 def build_run_index(results_dir: str = "results") -> pd.DataFrame:
+    """
+    Function to scan the results folder for all runs and create a master index of their metadata.
+    Parameters
+    ----------
+    results_dir : str
+        The path to the results folder containing run directories.
+    Returns
+    -------
+    pd.DataFrame
+        A DataFrame containing the metadata of all runs found in the results folder.
+    The index is saved as a CSV file and a Markdown table for easy viewing in VS Code
+    """
     results_path = Path(results_dir)
     records = []
 

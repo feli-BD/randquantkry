@@ -24,6 +24,7 @@ Typical use at the start of a benchmark session::
     log.info("session start", extra={"context": {"seed": 42}})
 """
 
+# Imports
 from __future__ import annotations
 
 import json
@@ -33,13 +34,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-# Name of the root logger for the whole package. Child loggers are created as
-# "randquantkry.<module>" and propagate up to this one.
+
 PACKAGE_LOGGER_NAME = "randquantkry"
 
-# A sentinel set of attributes that live on every LogRecord by default. Anything
-# NOT in this set was attached by the caller via ``extra=`` and should be
-# surfaced in the JSON output.
+# A sentinel set of attributes that live on every LogRecord 
 _STANDARD_RECORD_ATTRS = {
     "args",
     "asctime",

@@ -1,8 +1,22 @@
-import pandas as pd
+##########################################################################################
+#
+#                Integration tests for the parameter study pipeline in
+#                           randquantkry.benchmark.Benchmark.
+#
+###########################################################################################
 
+"""
+Integration tests for the parameter study pipeline in randquantkry.benchmark.Benchmark.
+They focus on verifying the correctness of the DataFrame output and the handling of edge cases, 
+such as skipping invalid krylov_dim values and ensuring relative error is present when naive computation is 
+feasible.
+"""
+
+import pandas as pd
+from randquantkry.benchmark import Benchmark
 
 def test_parameter_study_returns_dataframe_with_expected_columns(small_hamiltonian, small_initial_state, tmp_path):
-    from randquantkry.benchmark import Benchmark
+    """Test that the parameter study returns a DataFrame with the expected columns."""
 
     b = Benchmark(
         hamiltonian=small_hamiltonian,

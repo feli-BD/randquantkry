@@ -25,7 +25,7 @@ One test module per `src/` module, exercising it in isolation:
   order more accurate at fixed step count).
 - **`test_benchmark.py`** — the `Benchmark` class: method validation and the
   `krylov_dim` / `num_random_vectors` auto-resolution/clamping logic.
-- **`test_post_processing.py`** / **`test_obersvables.py`** — the plotting
+- **`test_post_processing.py`**  — the plotting
   data-prep helpers (`_filtered_xy`, `_sort_labels`, `_df_to_results`), kept
   free of matplotlib so they run headlessly.
 
